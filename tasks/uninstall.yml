@@ -7,24 +7,24 @@
 
 - name: Check existence of ConvertX systemd service
   ansible.builtin.stat:
-    path: "{{ devture_systemd_docker_base_systemd_path }}/{{ redlib_identifier }}.service"
-  register: redlib_service_stat
+    path: "{{ devture_systemd_docker_base_systemd_path }}/{{ convertx_identifier }}.service"
+  register: convertx_service_stat
 
-- when: redlib_service_stat.stat.exists | bool
+- when: convertx_service_stat.stat.exists | bool
   block:
     - name: Ensure ConvertX systemd service is stopped
       ansible.builtin.service:
-        name: "{{ redlib_identifier }}"
+        name: "{{ convertx_identifier }}"
         state: stopped
         enabled: false
         daemon_reload: true
 
     - name: Ensure ConvertX systemd service doesn't exist
       ansible.builtin.file:
-        path: "{{ devture_systemd_docker_base_systemd_path }}/{{ redlib_identifier }}.service"
+        path: "{{ devture_systemd_docker_base_systemd_path }}/{{ convertx_identifier }}.service"
         state: absent
 
     - name: Ensure ConvertX base directory doesn't exist
       ansible.builtin.file:
-        path: "{{ redlib_base_path }}"
+        path: "{{ convertx_base_path }}"
         state: absent
