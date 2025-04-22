@@ -3,7 +3,7 @@ galaxy_info:
   company: progressiv
   role_name: redlib
   namespace: progressiv
-  description: Redlib
+  description: ConvertX
   platforms:
     - name: Debian
       versions:
