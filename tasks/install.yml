@@ -14,6 +14,7 @@
     group: "{{ convertx_gid }}"
   with_items:
     - "{{ convertx_base_path }}"
+    - "{{ convertx_data_path }}"
 
 - name: Ensure ConvertX support files installed
   ansible.builtin.template:

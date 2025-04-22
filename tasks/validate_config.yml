@@ -16,6 +16,7 @@
     - convertx_hostname
     - convertx_path_prefix
     - convertx_container_network
+    - convertx_environment_variables_jwt_secret
 
 - when: convertx_container_labels_traefik_enabled | bool
   block:
