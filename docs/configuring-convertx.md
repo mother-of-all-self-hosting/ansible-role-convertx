@@ -20,7 +20,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 This is an [Ansible](https://www.ansible.com/) role which installs [ConvertX](https://github.com/C4illin/ConvertX) to run as a [Docker](https://www.docker.com/) container wrapped in a systemd service.
 
-ConvertX allows you to browse Reddit without exposing your IP address, browsing habits, and other browser fingerprinting data to the website.
+ConvertX is a self-hosted online file converter which supports a lot of different formats for pictures, video, images, document files, etc.
 
 See the project's [documentation](https://github.com/C4illin/ConvertX/blob/main/README.md) to learn what ConvertX does and why it might be useful to you.
 
