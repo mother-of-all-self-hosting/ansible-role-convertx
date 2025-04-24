@@ -101,11 +101,9 @@ If you use the MASH playbook, the shortcut commands with the [`just` program](ht
 
 ## Usage
 
-After running the command for installation, ConvertX becomes available at the specified hostname like `https://example.com`.
+After running the command for installation, ConvertX becomes available at the specified hostname like `https://example.com`. To use it, open the URL on the browser and create an account.
 
-[Libredirect](https://libredirect.github.io/), an extension for Firefox and Chromium-based desktop browsers, has support for redirections to ConvertX.
-
-If you would like to make your instance public so that it can be used by anyone including Libredirect, please consider to send a PR to the [upstream project](https://github.com/C4illin/ConvertX-instances) to add yours to the list, which Libredirect automatically fetches using a script (see [this FAQ entry](https://libredirect.github.io/faq.html#where_the_hell_are_those_instances_coming_from)). See [here](https://github.com/C4illin/ConvertX-instances/blob/main/README.md) for details about how to do so.
+Note that it is not available to restore the password if it is lost. In this case, you will need to uninstall the service and reinstall it to start it over.
 
 ## Troubleshooting
 
