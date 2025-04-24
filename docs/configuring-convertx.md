@@ -56,6 +56,29 @@ convertx_hostname: "example.com"
 
 After adjusting the hostname, make sure to adjust your DNS records to point the domain to your server.
 
+### Enable account registration (optional)
+
+To use ConvertX you need to create an account and log in to it on the browser.
+
+In order to prevent abuse, account registration will be disabled after the first user is created. You can enable it by adding the following configuration to your `vars.yml` file:
+
+```yaml
+convertx_environment_variables_account_registration: true
+```
+
+### Set a subpath (optional)
+
+It is possible to serve the instance under a subpath by adding the following configuration to your `vars.yml` file.
+
+```yaml
+convertx_environment_variables_webroot: YOUR_SUBPATH_HERE
+```
+
+For example, setting this to `/convert` will have the website served on `https://example.com/convert/`.
+
+>[!NOTE]
+> The subpath cannot be specified with the `convertx_path_prefix` variable.
+
 ### Extending the configuration
 
 There are some additional things you may wish to configure about the component.
@@ -64,7 +87,7 @@ Take a look at:
 
 - [`defaults/main.yml`](../defaults/main.yml) for some variables that you can customize via your `vars.yml` file. You can override settings (even those that don't have dedicated playbook variables) using the `convertx_environment_variables_additional_variables` variable
 
-See [`.env.example`](https://github.com/C4illin/ConvertX/blob/main/.env.example) for a complete list of ConvertX's config options that you could put in `convertx_environment_variables_additional_variables`.
+See [here](https://github.com/C4illin/ConvertX/blob/main/README.md#environment-variables) for a complete list of ConvertX's config options that you could put in `convertx_environment_variables_additional_variables`.
 
 ## Installing
 
