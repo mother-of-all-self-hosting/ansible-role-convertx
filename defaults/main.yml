@@ -16,7 +16,7 @@ convertx_base_path: "/{{ convertx_identifier }}"
 convertx_data_path: "{{ convertx_base_path }}/data"
 
 # renovate: datasource=docker depName=c4illin/convertx versioning=semver
-convertx_version: v0.12.1
+convertx_version: v0.13.0
 
 convertx_uid: ''
 convertx_gid: ''
