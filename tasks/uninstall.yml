@@ -19,12 +19,12 @@
         enabled: false
         daemon_reload: true
 
-    - name: Ensure ConvertX systemd service doesn't exist
+    - name: Ensure ConvertX systemd service does not exist
       ansible.builtin.file:
         path: "{{ devture_systemd_docker_base_systemd_path }}/{{ convertx_identifier }}.service"
         state: absent
 
-    - name: Ensure ConvertX base directory doesn't exist
+    - name: Ensure ConvertX path does not exist
       ansible.builtin.file:
         path: "{{ convertx_base_path }}"
         state: absent
