@@ -4,13 +4,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 ---
-
 - name: Check existence of ConvertX systemd service
   ansible.builtin.stat:
     path: "{{ devture_systemd_docker_base_systemd_path }}/{{ convertx_identifier }}.service"
   register: convertx_service_stat
 
-- when: convertx_service_stat.stat.exists | bool
+- name: Uninstall ConvertX systemd services and files
+  when: convertx_service_stat.stat.exists | bool
   block:
     - name: Ensure ConvertX systemd service is stopped
       ansible.builtin.service:

@@ -4,8 +4,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 ---
-
 - name: Perform ConvertX installation tasks
+  tags:
+    - setup-all
+    - setup-convertx
+    - install-all
+    - install-convertx
   block:
     - name: Validate ConvertX configuration
       when: convertx_enabled | bool
@@ -14,17 +18,12 @@
     - name: Install ConvertX
       when: convertx_enabled | bool
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/install.yml"
+
+- name: Perform ConvertX uninstallation tasks
   tags:
     - setup-all
     - setup-convertx
-    - install-all
-    - install-convertx
-
-- name: Perform ConvertX uninstallation tasks
   block:
     - name: Uninstall ConvertX
       when: not convertx_enabled | bool
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/uninstall.yml"
-  tags:
-    - setup-all
-    - setup-convertx

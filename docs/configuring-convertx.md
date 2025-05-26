@@ -87,7 +87,7 @@ Take a look at:
 
 - [`defaults/main.yml`](../defaults/main.yml) for some variables that you can customize via your `vars.yml` file. You can override settings (even those that don't have dedicated playbook variables) using the `convertx_environment_variables_additional_variables` variable
 
-See [here](https://github.com/C4illin/ConvertX/blob/main/README.md#environment-variables) for a complete list of ConvertX's config options that you could put in `convertx_environment_variables_additional_variables`.
+See [this section on the official documentation](https://github.com/C4illin/ConvertX/blob/main/README.md#environment-variables) for a complete list of ConvertX's config options that you could put in `convertx_environment_variables_additional_variables`.
 
 ## Installing
 
