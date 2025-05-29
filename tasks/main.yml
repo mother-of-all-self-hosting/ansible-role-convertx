@@ -14,7 +14,6 @@
     - name: Validate ConvertX configuration
       when: convertx_enabled | bool
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/validate_config.yml"
-
     - name: Install ConvertX
       when: convertx_enabled | bool
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/install.yml"
