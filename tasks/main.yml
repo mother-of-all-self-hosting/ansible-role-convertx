@@ -5,6 +5,7 @@
 
 ---
 - name: Perform ConvertX installation tasks
+  when: convertx_enabled | bool
   tags:
     - setup-all
     - setup-convertx
@@ -12,17 +13,15 @@
     - install-convertx
   block:
     - name: Validate ConvertX configuration
-      when: convertx_enabled | bool
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/validate_config.yml"
     - name: Install ConvertX
-      when: convertx_enabled | bool
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/install.yml"
 
 - name: Perform ConvertX uninstallation tasks
+  when: not convertx_enabled | bool
   tags:
     - setup-all
     - setup-convertx
   block:
     - name: Uninstall ConvertX
-      when: not convertx_enabled | bool
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/uninstall.yml"
