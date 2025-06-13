@@ -56,21 +56,21 @@
   block:
     - name: Ensure ConvertX repository is present on self-build
       ansible.builtin.git:
-        repo: "{{ convertx_container_repo }}"
-        version: "{{ convertx_container_repo_version }}"
-        dest: "{{ convertx_container_src_files_path }}"
+        repo: "{{ convertx_container_image_self_build_repo }}"
+        version: "{{ convertx_container_image_self_build_repo_version }}"
+        dest: "{{ convertx_container_image_self_build_src_files_path }}"
         force: "yes"
       register: convertx_git_pull_results
 
     - name: Ensure ConvertX container image is built
       community.docker.docker_image:
-        name: "{{ convertx_container_image_name }}"
+        name: "{{ convertx_container_image_self_build_name }}"
         source: build
         force_source: "{{ convertx_git_pull_results.changed if ansible_version.major > 2 or ansible_version.minor >= 8 else omit }}"
         force: "{{ omit if ansible_version.major > 2 or ansible_version.minor >= 8 else convertx_git_pull_results.changed }}"
         build:
           dockerfile: Dockerfile
-          path: "{{ convertx_container_src_files_path }}"
+          path: "{{ convertx_container_image_self_build_src_files_path }}"
           pull: true
           args:
 
