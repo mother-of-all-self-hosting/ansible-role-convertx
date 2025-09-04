@@ -42,12 +42,14 @@
         cmd: "rmdir {{ convertx_data_path }}"
       register: convertx_data_path_deletion_result
       changed_when: convertx_data_path_deletion_result.rc == 0
+      failed_when: false
 
     - name: Ensure ConvertX base path does not exist if empty
       ansible.builtin.command:
         cmd: "rmdir {{ convertx_base_path }}"
       register: convertx_base_path_deletion_result
       changed_when: convertx_base_path_deletion_result.rc == 0
+      failed_when: false
 
     - name: Ensure ConvertX container network does not exist via community.docker.docker_network
       when: devture_systemd_docker_base_container_network_creation_method == 'ansible-module'
