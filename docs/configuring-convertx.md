@@ -79,6 +79,14 @@ For example, setting this to `/convert` will have the website served on `https:/
 >[!NOTE]
 > The subpath cannot be specified with the `convertx_path_prefix` variable.
 
+### Disabling authentication function
+
+If the service is hosted locally or with an authentication service like [Tinyauth](https://tinyauth.app/), you can disable the authentication function of ConvertX in favor of it by adding the following configuration to your `vars.yml` file.
+
+```yaml
+convertx_environment_variables_allow_unauthenticated: true
+```
+
 ### Extending the configuration
 
 There are some additional things you may wish to configure about the component.
