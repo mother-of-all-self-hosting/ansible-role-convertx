@@ -18,13 +18,13 @@ convertx_data_path: "{{ convertx_base_path }}/data"
 # renovate: datasource=docker depName=c4illin/convertx versioning=semver
 convertx_version: v0.15.1
 
-convertx_uid: ''
-convertx_gid: ''
+convertx_uid: ""
+convertx_gid: ""
 
 convertx_scheme: https
 
 # The hostname at which ConvertX is served.
-convertx_hostname: ''
+convertx_hostname: ""
 
 # The path at which ConvertX is exposed.
 # This value must be `/`, as the subpath can only be specified with "convertx_environment_variables_webroot".
@@ -46,7 +46,7 @@ convertx_container_image_self_build_src_files_path: "{{ convertx_base_path }}/do
 # Controls whether the container exposes its HTTP port (tcp/80 in the container).
 #
 # Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
-convertx_container_http_host_bind_port: ''
+convertx_container_http_host_bind_port: ""
 
 # The base container network. It will be auto-created by this role if it doesn't exist already.
 convertx_container_network: "{{ convertx_identifier }}"
@@ -112,7 +112,7 @@ convertx_container_labels_traefik_additional_response_headers_custom: {}
 # convertx_container_labels_additional_labels: |
 #   my.label=1
 #   another.label="here"
-convertx_container_labels_additional_labels: ''
+convertx_container_labels_additional_labels: ""
 
 # A list of extra arguments to pass to the container (`docker run` command)
 convertx_container_extra_arguments: []
@@ -196,7 +196,7 @@ convertx_environment_variables_auto_delete_every_n_hours: 24
 
 # Specify the address to the root path
 # Setting this to "/convert" will serve the website on "{{ convertx_hostname }}/convert/"
-convertx_environment_variables_webroot: ''
+convertx_environment_variables_webroot: ""
 
 # Specify arguments to pass to ffmpeg, e.g. -preset veryfast
 convertx_environment_variables_ffmpeg_args: ""
@@ -205,4 +205,4 @@ convertx_environment_variables_ffmpeg_args: ""
 convertx_environment_variables_hide_history: false
 
 # Additional environment variables.
-convertx_environment_variables_additional_variables: ''
+convertx_environment_variables_additional_variables: ""
