@@ -56,6 +56,14 @@ convertx_hostname: "example.com"
 
 After adjusting the hostname, make sure to adjust your DNS records to point the domain to your server.
 
+### Set a random string for signing authentication tokens
+
+You also need to set a random string for signing authentication tokens. To do so, add the following configuration to your `vars.yml` file. The value can be generated with `pwgen -s 64 1` or in another way.
+
+```yaml
+convertx_environment_variables_jwt_secret: YOUR_SECRET_KEY_HERE
+```
+
 ### Enable account registration (optional)
 
 To use ConvertX you need to create an account and log in to it on the browser.
