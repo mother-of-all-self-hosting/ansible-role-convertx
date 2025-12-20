@@ -176,6 +176,9 @@ convertx_systemd_wanted_services_list_default: []
 convertx_systemd_wanted_services_list_auto: []
 convertx_systemd_wanted_services_list_custom: []
 
+# Specify the timezone
+convertx_environment_variables_tz: UTC
+
 # Specify a long and secret string used to sign the JSON Web Token
 convertx_environment_variables_jwt_secret: ""
 
