@@ -26,7 +26,7 @@ convertx_scheme: https
 # The hostname at which ConvertX is served.
 convertx_hostname: ""
 
-# The path at which ConvertX is exposed.
+# The path at which ConvertX is served.
 # This value must be `/`, as the subpath can only be specified with "convertx_environment_variables_webroot".
 convertx_path_prefix: /
 
