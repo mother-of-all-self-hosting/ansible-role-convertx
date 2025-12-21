@@ -117,7 +117,7 @@ convertx_container_labels_additional_labels: "{{ convertx_container_labels_addit
 convertx_container_labels_additional_labels_auto: {}
 convertx_container_labels_additional_labels_custom: {}
 
-# A list of extra arguments to pass to the container (`docker run` command)
+# A list of extra arguments to pass to the container (`docker create` command)
 convertx_container_extra_arguments: "{{ convertx_container_extra_arguments_auto + convertx_container_extra_arguments_custom }}"
 convertx_container_extra_arguments_auto: []
 convertx_container_extra_arguments_custom: []
