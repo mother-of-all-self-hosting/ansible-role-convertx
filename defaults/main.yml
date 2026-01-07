@@ -111,11 +111,11 @@ convertx_container_labels_traefik_additional_response_headers_custom: {}
 #
 # Example:
 # convertx_container_labels_additional_labels_custom: |
-#   my.label=1
-#   another.label="here"
-convertx_container_labels_additional_labels: "{{ convertx_container_labels_additional_labels_auto | combine(convertx_container_labels_additional_labels_custom) }}"
-convertx_container_labels_additional_labels_auto: {}
-convertx_container_labels_additional_labels_custom: {}
+#   - my.label=1
+#   - another.label="here"
+convertx_container_labels_additional_labels: "{{ convertx_container_labels_additional_labels_auto + convertx_container_labels_additional_labels_custom }}"
+convertx_container_labels_additional_labels_auto: []
+convertx_container_labels_additional_labels_custom: []
 
 # A list of extra arguments to pass to the container (`docker create` command)
 convertx_container_extra_arguments: "{{ convertx_container_extra_arguments_auto + convertx_container_extra_arguments_custom }}"
