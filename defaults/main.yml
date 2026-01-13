@@ -21,6 +21,7 @@ convertx_version: v0.16.1
 convertx_uid: ""
 convertx_gid: ""
 
+# The scheme used for serving ConvertX.
 convertx_scheme: https
 
 # The hostname at which ConvertX is served.
@@ -43,7 +44,7 @@ convertx_container_image_self_build_repo: "https://github.com/C4illin/ConvertX.g
 convertx_container_image_self_build_repo_version: "{{ convertx_version if convertx_version != 'latest' else 'main' }}"
 convertx_container_image_self_build_src_files_path: "{{ convertx_base_path }}/docker-src"
 
-# Controls whether the container exposes its HTTP port (tcp/80 in the container).
+# Controls whether the container exposes its HTTP port (tcp/3000 in the container).
 #
 # Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
 convertx_container_http_host_bind_port: ""
