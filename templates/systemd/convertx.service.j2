@@ -37,7 +37,7 @@ ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
       --label-file={{ convertx_base_path }}/labels \
       --mount type=bind,src={{ convertx_data_path }},dst=/app/data \
       {% for volume in convertx_container_additional_volumes %}
-      --mount type={{ volume.type | default('bind' if '/' in volume.src else 'volume') }},src={{ volume.src }},dst={{ volume.dst }}{{ (',' + volume.options) if volume.options else '' }} \
+      --mount type={{ volume.type | default('bind' if '/' in volume.src else 'volume') }},src={{ volume.src }},dst={{ volume.dst }}{{ (',' + volume.options) if volume.options | default('') else '' }} \
       {% endfor %}
       --tmpfs=/tmp:rw,noexec,nosuid,size={{ convertx_container_tmpfs_tmp_size }} \
       {% for arg in convertx_container_extra_arguments %}
