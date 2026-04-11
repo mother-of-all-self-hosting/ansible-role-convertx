@@ -76,7 +76,7 @@
   register: convertx_data_path_stat
 
 # We just want to notify the user. Deleting data is too destructive.
-- name: Notify if ConvertX local data remains
+- name: Inject the message about the remaining ConvertX local data path
   when: convertx_data_path_stat.stat.exists | bool
   ansible.builtin.set_fact:
     devture_playbook_runtime_messages_list: |
