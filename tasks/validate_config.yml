@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2023 Slavi Pantaleev
-# SPDX-FileCopyrightText: 2025 Suguru Hirahara
+# SPDX-FileCopyrightText: 2025, 2026 Suguru Hirahara
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -16,15 +16,16 @@
 - name: Fail if required ConvertX settings not defined
   ansible.builtin.fail:
     msg: >-
-      You need to define a required configuration setting (`{{ item }}`).
-  when: "lookup('vars', item, default='') | string | length == 0"
+      You need to define a required configuration setting (`{{ item.name }}`).
+  when: "item.when | bool and lookup('vars', item.name, default='') | string | length == 0"
   with_items:
-    - convertx_uid
-    - convertx_gid
-    - convertx_hostname
-    - convertx_path_prefix
-    - convertx_container_network
-    - convertx_environment_variables_jwt_secret
+    - { "name": "convertx_uid", when: true }
+    - { "name": "convertx_gid", when: true }
+    - { "name": "convertx_hostname", when: true }
+    - { "name": "convertx_path_prefix", when: true }
+    - { "name": "convertx_container_network", when: true }
+    - { "name": "convertx_container_labels_traefik_middleware_basic_auth_users", when: "{{ convertx_container_labels_traefik_middleware_basic_auth_enabled }}" }
+    - { "name": "convertx_environment_variables_jwt_secret", when: true }
 
 - name: Run if Traefik is enabled
   when: convertx_container_labels_traefik_enabled | bool
