@@ -36,7 +36,6 @@ convertx_container_image_tag: "{{ convertx_version }}"
 convertx_container_image_registry_prefix: "{{ convertx_container_image_registry_prefix_upstream }}"
 convertx_container_image_registry_prefix_upstream: "{{ convertx_container_image_registry_prefix_upstream_default }}"
 convertx_container_image_registry_prefix_upstream_default: docker.io/
-convertx_container_image_force_pull: "{{ convertx_container_image.endswith(':latest') }}"
 
 convertx_container_image_self_build: false
 convertx_container_image_self_build_name: "c4illin/convertx:{{ convertx_container_image_self_build_repo_version }}" # the image name must be lowercase
