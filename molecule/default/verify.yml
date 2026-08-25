@@ -1,15 +1,87 @@
-# SPDX-FileCopyrightText: 2026 spatterlight
+# SPDX-FileCopyrightText: 2026 Slavi Pantaleev
 # SPDX-FileCopyrightText: 2026 Suguru Hirahara
+# SPDX-FileCopyrightText: 2026 spatterlight
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 ---
-- name: Verify ConvertX systemd service
+# What this suite is guarding against
+#
+# ConvertX answers on HTTP long before it is usable, and it answers with a
+# redirect either way, so "the unit is active and something returned 200 or
+# 302" is true of an instance that was never configured at all. Started with no
+# environment whatsoever, ConvertX still serves `/healthcheck` as `{"status":
+# "ok"}` and still redirects `/` with a 302 - just to `/setup` instead of
+# `/login`. `Restart=always` on the systemd unit means the unit reports
+# `active` even while the container crash-loops.
+#
+# So the suite proves three separate things, each of which can fail on its own:
+#
+# 1. The role's configuration reached the process. The JWT the service issues
+#    is verified against the JWT_SECRET the role rendered, and two settings are
+#    given deliberately non-default values whose effects are observed.
+# 2. The running image is the version defaults/main.yml pins - the claim that
+#    lets Renovate's patch bumps merge without a human.
+# 3. ConvertX actually converts. A generated file carrying a marker is uploaded,
+#    converted to another format, downloaded, and checked for both the target
+#    format's structure and the marker. A conversion service that returns a
+#    well-formed file of the right type holding the wrong bytes would pass a
+#    magic-bytes check and fails here.
+#
+# Note that the `location` the uri module reports is absolutized against the
+# request URL, so every assertion on a redirect target compares the path rather
+# than the raw header value.
+
+- name: Verify ConvertX
   hosts: all
   become: true
   gather_facts: false
+
+  vars:
+    convertx_molecule_base_url: http://localhost:3000
+    convertx_molecule_input_name: convertx-molecule-probe.md
+    convertx_molecule_output_name: convertx-molecule-probe.html
+
+    # Recomputes the HS256 signature of a JWT and prints its `id` claim.
+    # Exits non-zero when the token was not signed with the given secret.
+    convertx_molecule_jwt_verifier: |
+      import base64, hashlib, hmac, json, sys
+
+      token, secret = sys.argv[1], sys.argv[2]
+
+      header_b64, payload_b64, signature_b64 = token.split(".")
+
+      def decode(value):
+          return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+      algorithm = json.loads(decode(header_b64)).get("alg")
+      if algorithm != "HS256":
+          sys.exit("expected an HS256 JWT, got " + str(algorithm))
+
+      signed = (header_b64 + "." + payload_b64).encode()
+      expected = base64.urlsafe_b64encode(
+          hmac.new(secret.encode(), signed, hashlib.sha256).digest()
+      ).rstrip(b"=").decode()
+
+      if not hmac.compare_digest(expected, signature_b64):
+          sys.exit("the auth JWT is not signed with the configured JWT_SECRET")
+
+      sys.stdout.write(str(json.loads(decode(payload_b64))["id"]))
+
   tasks:
-    - name: Wait for ConvertX service to become active (up to 180s)
+    # ----------------------------------------------------------------------
+    # The service is up
+    # ----------------------------------------------------------------------
+
+    # Loaded under a name of its own so that it cannot shadow the values this
+    # scenario tunes in its group_vars. Only leaf literals may be read from it;
+    # anything Jinja-derived would have no context to be rendered in here.
+    - name: Read the role's defaults
+      ansible.builtin.include_vars:
+        file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
+        name: convertx_role_defaults
+
+    - name: Wait for the ConvertX systemd service to become active
       ansible.builtin.systemd:
         name: convertx.service
       register: convertx_service
@@ -17,37 +89,365 @@
       retries: 36
       delay: 5
 
-    - name: Assert ConvertX service is active
+    # `Restart=always` would report `active` for a container that boots and
+    # dies every 30 seconds, so this is a gate and not a result.
+    - name: Assert the ConvertX systemd service is active
       ansible.builtin.assert:
         that: convertx_service.status.ActiveState == 'active'
-        fail_msg: "convertx.service not active ({{ convertx_service.status.ActiveState }})"
-        success_msg: "convertx.service is active"
+        fail_msg: "convertx.service is {{ convertx_service.status.ActiveState }}, not active"
+        success_msg: convertx.service is active
 
-    - name: Retrieve ConvertX service log for debugging
+    - name: Retrieve the ConvertX service log for debugging
       when: convertx_debug_service_enabled | bool
       ansible.builtin.command:
         cmd: journalctl -xeu convertx.service
       changed_when: false
 
-    - name: Wait for ConvertX HTTP endpoint to respond (up to 10m)
+    - name: Wait for the ConvertX health endpoint to report ok (up to 10m)
       ansible.builtin.uri:
-        url: "http://localhost:3000/"
+        url: "{{ convertx_molecule_base_url }}/healthcheck"
         method: GET
-        status_code: [200, 302]
         follow_redirects: none
-      register: convertx_endpoint
-      until: convertx_endpoint.status in [200, 302]
+        return_content: true
+      register: convertx_healthcheck
+      until: convertx_healthcheck.status == 200 and convertx_healthcheck.json.status | default('') == 'ok'
       retries: 120
       delay: 5
 
-    - name: Assert ConvertX HTTP endpoint responds
-      ansible.builtin.assert:
-        that: convertx_endpoint.status in [200, 302]
-        fail_msg: "ConvertX did not respond as expected ({{ convertx_endpoint.status | default('no response') }})"
-        success_msg: "ConvertX responded with {{ convertx_endpoint.status }}"
+    # ----------------------------------------------------------------------
+    # Negative controls, taken before an account exists
+    # ----------------------------------------------------------------------
 
-    - name: Show ConvertX systemd service status summary
+    # An unconfigured ConvertX and a working one both answer `/` with a 302.
+    # They differ in where they send you: a service with no accounts yet offers
+    # its unauthenticated first-run form at `/setup`. Asserting on the target,
+    # here and again after registering, is what makes the later `/login`
+    # assertion mean something.
+    - name: Confirm ConvertX offers its first-run setup form while no account exists
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/"
+        method: GET
+        follow_redirects: none
+        status_code: 302
+      register: convertx_root_before_registration
+
+    - name: Assert ConvertX is in its first-run state
+      ansible.builtin.assert:
+        that: convertx_root_before_registration.location | urlsplit('path') == '/setup'
+        fail_msg: "expected / to redirect to /setup before registration, got {{ convertx_root_before_registration.location | default('no Location header') }}"
+        success_msg: / redirects to /setup, so ConvertX has no accounts yet
+
+    # Installer and wizard pages of other applications answer every path with a
+    # 200, which turns any probe that only looks at status codes into a no-op.
+    - name: Confirm ConvertX does not answer unknown paths
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/convertx-molecule-no-such-path"
+        method: GET
+        follow_redirects: none
+        status_code: 404
+
+    # ----------------------------------------------------------------------
+    # The running image is the version the role pins
+    # ----------------------------------------------------------------------
+
+    # ConvertX announces its own version on stdout at boot, which the systemd
+    # unit puts in the journal. This is the running process talking, not a
+    # label attached to the image by whoever built it.
+    - name: Read the version ConvertX announced at startup
+      ansible.builtin.command:
+        cmd: journalctl -u convertx.service --no-pager --output=cat
+      register: convertx_journal
+      changed_when: false
+
+    - name: Assert ConvertX announced the pinned version
+      ansible.builtin.assert:
+        that: ('ConvertX ' ~ convertx_role_defaults.convertx_version) in convertx_journal.stdout
+        fail_msg: "the journal does not contain 'ConvertX {{ convertx_role_defaults.convertx_version }}'"
+        success_msg: "ConvertX announced itself as {{ convertx_role_defaults.convertx_version }}"
+
+    # Corroborated from the running container's own filesystem, because the
+    # journal could in principle be carrying a line from an earlier image.
+    - name: Read the version recorded in the running container
+      ansible.builtin.command:
+        cmd: docker exec convertx cat /app/dist/package.json
+      register: convertx_container_package_json
+      changed_when: false
+
+    - name: Assert the running container carries the pinned version
+      vars:
+        convertx_reported_version: "{{ (convertx_container_package_json.stdout | from_json)['version'] }}"
+        convertx_pinned_version: "{{ convertx_role_defaults.convertx_version | regex_replace('^v', '') }}"
+      ansible.builtin.assert:
+        that: convertx_reported_version == convertx_pinned_version
+        fail_msg: "the running container reports {{ convertx_reported_version }}, expected {{ convertx_pinned_version }}"
+        success_msg: "the running container reports {{ convertx_reported_version }}"
+
+    # ----------------------------------------------------------------------
+    # Register an account through the first-run form
+    # ----------------------------------------------------------------------
+
+    - name: Register the ConvertX account used by this suite
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/register"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          email: "{{ convertx_molecule_account_email }}"
+          password: "{{ convertx_molecule_account_password }}"
+        follow_redirects: none
+        status_code: 302
+      register: convertx_register
+
+    # The uri module does not fill in `cookies` when it is told not to follow
+    # redirects, so the token is taken out of the raw Set-Cookie header.
+    - name: Remember the auth cookie ConvertX issued
+      ansible.builtin.set_fact:
+        convertx_auth_cookie: "{{ convertx_register.set_cookie | default('') | regex_search('auth=([^;]+)', '\\1') | first | default('') }}"
+
+    - name: Assert registration issued an auth cookie
+      ansible.builtin.assert:
+        that:
+          - convertx_auth_cookie | length > 0
+          - convertx_auth_cookie.split('.') | length == 3
+        fail_msg: "registration did not set an auth cookie: {{ convertx_register.set_cookie | default('no Set-Cookie header') }}"
+        success_msg: registration issued an auth cookie
+
+    # ----------------------------------------------------------------------
+    # The role's configuration reached the process
+    # ----------------------------------------------------------------------
+
+    # `convertx_environment_variables_http_allowed` is false by default, both
+    # in this role and in ConvertX itself, and the scenario sets it to true.
+    # ConvertX only drops `Secure` from its cookies when it has seen the
+    # variable, so an env file that never arrived shows up here.
+    - name: Assert HTTP_ALLOWED reached the process
+      ansible.builtin.assert:
+        that:
+          - convertx_register.set_cookie is defined
+          - "'auth=' in convertx_register.set_cookie"
+          - "'Secure' not in convertx_register.set_cookie"
+        fail_msg: "the auth cookie is marked Secure, so HTTP_ALLOWED did not reach the process: {{ convertx_register.set_cookie | default('no Set-Cookie header') }}"
+        success_msg: the auth cookie is not marked Secure, as HTTP_ALLOWED=true requires
+
+    # With JWT_SECRET unset, ConvertX signs its tokens with a randomUUID() it
+    # generates at boot. A token that verifies against the value in the
+    # scenario's group_vars can only have been signed by a process that read
+    # the `env` file this role rendered.
+    - name: Verify the auth JWT against the configured JWT_SECRET
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - "{{ convertx_molecule_jwt_verifier }}"
+          - "{{ convertx_auth_cookie }}"
+          - "{{ convertx_environment_variables_jwt_secret }}"
+      register: convertx_jwt
+      changed_when: false
+
+    - name: Assert the JWT identifies a user
+      ansible.builtin.assert:
+        that: convertx_jwt.stdout | int > 0
+        fail_msg: "the verified JWT carries no usable user id ({{ convertx_jwt.stdout }})"
+        success_msg: "the auth JWT is signed with the role's JWT_SECRET and identifies user {{ convertx_jwt.stdout }}"
+
+    # ----------------------------------------------------------------------
+    # Negative controls, taken now that an account exists
+    # ----------------------------------------------------------------------
+
+    - name: Confirm the ConvertX first-run window has closed
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/"
+        method: GET
+        follow_redirects: none
+        status_code: 302
+      register: convertx_root_after_registration
+
+    - name: Assert unauthenticated visitors are sent to the login page
+      ansible.builtin.assert:
+        that: convertx_root_after_registration.location | urlsplit('path') == '/login'
+        fail_msg: "expected / to redirect to /login once an account exists, got {{ convertx_root_after_registration.location | default('no Location header') }}"
+        success_msg: / redirects to /login, so the unauthenticated setup form is gone
+
+    - name: Confirm ConvertX refuses registration
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/register"
+        method: GET
+        follow_redirects: none
+        status_code: 302
+      register: convertx_registration_page
+
+    - name: Assert account registration is disabled
+      ansible.builtin.assert:
+        that: convertx_registration_page.location | urlsplit('path') == '/login'
+        fail_msg: "expected /register to redirect to /login, got {{ convertx_registration_page.location | default('no Location header') }}"
+        success_msg: /register is refused, as ACCOUNT_REGISTRATION=false requires
+
+    # ----------------------------------------------------------------------
+    # Convert a file, end to end
+    # ----------------------------------------------------------------------
+
+    # ConvertX ties uploads to a job, and creates that job when a signed-in
+    # browser loads the home page. The response also carries the header this
+    # suite reads HIDE_HISTORY out of.
+    - name: Open the ConvertX home page to start a conversion job
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/"
+        method: GET
+        headers:
+          Cookie: "auth={{ convertx_auth_cookie }}"
+        follow_redirects: none
+        status_code: 200
+        return_content: true
+      register: convertx_home
+
+    - name: Remember the conversion job ConvertX started
+      ansible.builtin.set_fact:
+        convertx_job_id: "{{ convertx_home.set_cookie | default('') | regex_search('jobId=([^;]+)', '\\1') | first | default('') }}"
+
+    - name: Assert a conversion job was started
+      ansible.builtin.assert:
+        that: convertx_job_id | int > 0
+        fail_msg: "the home page did not hand out a jobId cookie: {{ convertx_home.set_cookie | default('no Set-Cookie header') }}"
+        success_msg: "conversion job {{ convertx_job_id }} was started"
+
+    # `convertx_environment_variables_hide_history` is false by default and the
+    # scenario sets it to true. ConvertX renders the signed-in header from that
+    # value, so the History link disappearing while the Account link stays is
+    # the role's own setting being observed. Checking that the Account link is
+    # still there keeps the assertion from passing on an empty page.
+    - name: Assert HIDE_HISTORY reached the process
+      ansible.builtin.assert:
+        that:
+          - "'\"/account\"' in convertx_home.content"
+          - "'\"/history\"' not in convertx_home.content"
+        fail_msg: the signed-in header still links to /history, so HIDE_HISTORY did not reach the process
+        success_msg: the signed-in header omits /history, as HIDE_HISTORY=true requires
+
+    # Markdown carrying a marker, converted to HTML. The marker has to come out
+    # the other side, and it has to come out inside HTML structure that the
+    # input did not have - a service that merely handed the upload back would
+    # satisfy the marker on its own.
+    #
+    # The part is given as `content` rather than as a path, for two reasons.
+    # The uri module resolves a multipart `filename` on the controller and
+    # ships the file to the target, so a file generated here would not be
+    # found; and a part given as a path is base64-encoded, with a
+    # Content-Transfer-Encoding header that HTTP multipart does not act on, so
+    # ConvertX would store the base64 text as the file. That conversion still
+    # succeeds and still returns well-formed HTML - holding the base64 instead
+    # of the document. Nothing but the marker assertion below would notice.
+    - name: Upload the file to ConvertX
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/upload"
+        method: POST
+        headers:
+          Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_job_id }}"
+        body_format: form-multipart
+        body:
+          file:
+            filename: "{{ convertx_molecule_input_name }}"
+            mime_type: text/markdown
+            content: |
+              # Heading {{ convertx_molecule_marker }}
+
+              Body paragraph containing {{ convertx_molecule_marker }} here.
+        follow_redirects: none
+        status_code: 200
+      register: convertx_upload
+
+    - name: Assert the upload was accepted
+      ansible.builtin.assert:
+        that: convertx_upload.json.message | default('') == 'Files uploaded successfully.'
+        fail_msg: "ConvertX did not accept the upload: {{ convertx_upload.json | default(convertx_upload.content | default('no response')) }}"
+        success_msg: ConvertX accepted the upload
+
+    # `convert_to` is `<target format>,<converter>`; pandoc is one of the
+    # converters the image ships, and markdown to HTML is the cheapest
+    # conversion that visibly restructures its input.
+    - name: Ask ConvertX to convert the file from Markdown to HTML
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/convert"
+        method: POST
+        headers:
+          Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_job_id }}"
+        body_format: form-urlencoded
+        body:
+          convert_to: html,pandoc
+          file_names: '["{{ convertx_molecule_input_name }}"]'
+        follow_redirects: none
+        status_code: 302
+      register: convertx_convert
+
+    - name: Assert the conversion was queued
+      ansible.builtin.assert:
+        that: convertx_convert.location | urlsplit('path') == '/results/' ~ convertx_job_id
+        fail_msg: "ConvertX did not queue the conversion, it redirected to {{ convertx_convert.location | default('nowhere') }}"
+        success_msg: the conversion was queued
+
+    # ConvertX converts in the background and only writes the result row once
+    # the converter has resolved, so a conversion that fails never reaches
+    # `Done` and this task is where the suite stops.
+    - name: Wait for the conversion to finish (up to 5m)
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/results/{{ convertx_job_id }}"
+        method: GET
+        headers:
+          Cookie: "auth={{ convertx_auth_cookie }}"
+        follow_redirects: none
+        status_code: 200
+        return_content: true
+      register: convertx_results
+      until: "'<td>Done</td>' in convertx_results.content"
+      retries: 60
+      delay: 5
+
+    - name: Download the converted file
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/download/{{ convertx_jwt.stdout }}/{{ convertx_job_id }}/{{ convertx_molecule_output_name }}"
+        method: GET
+        headers:
+          Cookie: "auth={{ convertx_auth_cookie }}"
+        follow_redirects: none
+        status_code: 200
+        return_content: true
+      register: convertx_download
+
+    # The marker proves the output was made from this suite's input; the HTML
+    # structure proves the file was converted rather than handed back; the
+    # absence of the Markdown heading syntax proves the input was consumed.
+    - name: Assert the downloaded file is the converted input
+      ansible.builtin.assert:
+        that:
+          - convertx_molecule_marker in convertx_download.content
+          - "'<h1' in convertx_download.content"
+          - "'</p>' in convertx_download.content"
+          - "'# Heading' not in convertx_download.content"
+        fail_msg: "the downloaded file is not this suite's input converted to HTML: {{ convertx_download.content | default('no content') | truncate(300) }}"
+        success_msg: ConvertX converted the uploaded Markdown to HTML and kept its content
+
+    # ----------------------------------------------------------------------
+    # The converted file is not world-readable
+    # ----------------------------------------------------------------------
+
+    - name: Confirm the converted file cannot be downloaded without the auth cookie
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/download/{{ convertx_jwt.stdout }}/{{ convertx_job_id }}/{{ convertx_molecule_output_name }}"
+        method: GET
+        follow_redirects: none
+        status_code: [401, 403, 422]
+        return_content: true
+      register: convertx_download_unauthenticated
+
+    - name: Assert the unauthenticated download returned nothing of ours
+      ansible.builtin.assert:
+        that: convertx_molecule_marker not in (convertx_download_unauthenticated.content | default(''))
+        fail_msg: an unauthenticated request was served the converted file
+        success_msg: "the converted file is refused without the auth cookie (HTTP {{ convertx_download_unauthenticated.status }})"
+
+    - name: Show what was verified
       ansible.builtin.debug:
         msg:
-          - "ConvertX systemd: {{ convertx_service.status.ActiveState }}"
-          - "ConvertX HTTP: {{ convertx_endpoint.status }}"
+          - "systemd: {{ convertx_service.status.ActiveState }}"
+          - "version announced by the running process: {{ convertx_role_defaults.convertx_version }}"
+          - "JWT_SECRET and HTTP_ALLOWED and HIDE_HISTORY: observed in the process"
+          - "conversion: {{ convertx_molecule_input_name }} -> {{ convertx_molecule_output_name }}, marker survived"

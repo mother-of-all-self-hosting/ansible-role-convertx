@@ -1,5 +1,6 @@
-# SPDX-FileCopyrightText: 2026 spatterlight
+# SPDX-FileCopyrightText: 2026 Slavi Pantaleev
 # SPDX-FileCopyrightText: 2026 Suguru Hirahara
+# SPDX-FileCopyrightText: 2026 spatterlight
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -31,6 +32,17 @@ provisioner:
         # Helper variables
         convertx_debug_service_enabled: false
 
+        # The account the verification playbook registers and converts a file as.
+        # ConvertX has no API for creating users, so the suite drives the same
+        # first-run form a human would.
+        convertx_molecule_account_email: molecule@example.com
+        convertx_molecule_account_password: molecule-password-nrq48
+
+        # A marker that has to survive the conversion. Asserting on it is what
+        # separates "the service returned a file of the right type" from "the
+        # service converted the file we actually gave it".
+        convertx_molecule_marker: MASHMOLECULEMARKER7f3ac91b
+
         # Variables for ConvertX
         convertx_uid: 1000
         convertx_gid: 1000
@@ -38,7 +50,27 @@ provisioner:
         convertx_hostname: localhost
         convertx_container_labels_traefik_enabled: false
         convertx_container_http_host_bind_port: 3000
-        convertx_environment_variables_jwt_secret: secret
+
+        # Verified end to end: the auth cookie ConvertX hands out is a JWT, and
+        # the verification playbook recomputes its HS256 signature with this
+        # exact value. Nothing but the role's own `env` file could have put it
+        # into the process - with JWT_SECRET unset, ConvertX signs with a
+        # randomUUID() it invents at boot.
+        convertx_environment_variables_jwt_secret: molecule-jwt-secret-4f2a9c
+
+        # Deliberately non-default, so that observing them proves the role's
+        # template reached the process rather than ConvertX's own fallbacks:
+        #
+        # - HTTP_ALLOWED makes ConvertX drop the `Secure` attribute from its
+        #   cookies, which is also what lets this suite log in over plain HTTP
+        # - HIDE_HISTORY removes the History link from the signed-in header
+        convertx_environment_variables_http_allowed: true
+        convertx_environment_variables_hide_history: true
+
+        # Left at the role's default on purpose: the verification playbook
+        # asserts that `/register` is refused, and that ConvertX's first-run
+        # window closes once an account exists.
+        convertx_environment_variables_account_registration: false
   env:
     # Workaround for https://github.com/ansible/molecule/issues/4391
     ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/..:/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles:~/.ansible/roles
