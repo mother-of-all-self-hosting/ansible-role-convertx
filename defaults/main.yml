@@ -246,8 +246,16 @@ convertx_environment_variables_auto_delete_every_n_hours: 24
 # Setting this to "/convert" will serve the website on "{{ convertx_hostname }}/convert/"
 convertx_environment_variables_webroot: ""
 
-# Specify arguments to pass to ffmpeg, e.g. -preset veryfast
+# Specify arguments to pass to ffmpeg BEFORE the input file, e.g. -hwaccel vaapi
+#
+# ConvertX places these in front of `-i`, which makes them ffmpeg's *input*
+# options. Output options (`-preset`, `-crf`, ...) do not work in this position
+# and belong in `convertx_environment_variables_ffmpeg_output_args` instead.
+# See: https://github.com/C4illin/ConvertX/issues/190 about hardware acceleration
 convertx_environment_variables_ffmpeg_args: ""
+
+# Specify arguments to pass to ffmpeg AFTER the input file, e.g. -preset veryfast
+convertx_environment_variables_ffmpeg_output_args: ""
 
 # Control whether the history page is hidden
 convertx_environment_variables_hide_history: false
