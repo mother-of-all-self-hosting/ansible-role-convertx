@@ -47,7 +47,17 @@ Currently there is one testing scenario available.
 
 ### `default`
 
-Tests a standard ConvertX installation.
+Tests a standard ConvertX installation, and then uses it.
+
+ConvertX answers on HTTP long before it is usable, and answers with a redirect either way, so the scenario deliberately does not settle for "the unit is active and something responded". Started with no configuration at all, ConvertX still reports `/healthcheck` as ok and still redirects `/` with a 302 — to `/setup` rather than `/login` — and `Restart=always` reports the unit as active even while the container crash-loops.
+
+The scenario therefore checks three things that can fail independently of each other:
+
+- **the role's configuration reached the process** — the HS256 signature of the auth cookie ConvertX issues is recomputed against the `JWT_SECRET` the role rendered (with that variable unset, ConvertX signs with a `randomUUID()` it invents at boot), and `HTTP_ALLOWED` and `HIDE_HISTORY` are given non-default values whose effects are observed in the response headers and in the rendered page
+- **the running image is the version `defaults/main.yml` pins** — read both from the line the process prints at startup and from the container's own `dist/package.json`
+- **ConvertX actually converts** — a generated Markdown file carrying a marker is uploaded, converted to HTML through pandoc, downloaded, and required to contain both the marker and HTML structure that the input did not have
+
+Negative controls surround those: the `/setup` redirect is asserted before an account exists and the `/login` redirect afterwards, unknown paths must return 404, `/register` must be refused, and the converted file must not be served to a request that carries no auth cookie.
 
 ## Running
 
