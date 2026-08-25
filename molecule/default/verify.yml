@@ -26,7 +26,9 @@
 #    converted to another format, downloaded, and checked for both the target
 #    format's structure and the marker. A conversion service that returns a
 #    well-formed file of the right type holding the wrong bytes would pass a
-#    magic-bytes check and fails here.
+#    magic-bytes check and fails here. This happens twice: once through pandoc,
+#    a single binary that runs anywhere, and once through LibreOffice, which
+#    needs a writable profile directory and fails to start without one.
 #
 # Note that the `location` the uri module reports is absolutized against the
 # request URL, so every assertion on a redirect target compares the path rather
@@ -41,6 +43,8 @@
     convertx_molecule_base_url: http://localhost:3000
     convertx_molecule_input_name: convertx-molecule-probe.md
     convertx_molecule_output_name: convertx-molecule-probe.html
+    convertx_molecule_libreoffice_input_name: convertx-molecule-probe.txt
+    convertx_molecule_libreoffice_output_name: convertx-molecule-probe.rtf
 
     # Recomputes the HS256 signature of a JWT and prints its `id` claim.
     # Exits non-zero when the token was not signed with the given secret.
@@ -424,6 +428,94 @@
           - "'# Heading' not in convertx_download.content"
         fail_msg: "the downloaded file is not this suite's input converted to HTML: {{ convertx_download.content | default('no content') | truncate(300) }}"
         success_msg: ConvertX converted the uploaded Markdown to HTML and kept its content
+
+    # ----------------------------------------------------------------------
+    # Convert through LibreOffice too
+    # ----------------------------------------------------------------------
+
+    # pandoc is a single self-contained binary and runs under any conditions.
+    # LibreOffice does not: it refuses to start unless it can create a user
+    # profile, and the container gives it a read-only root filesystem and a UID
+    # with no home directory. `convertx_environment_variables_xdg_config_home`
+    # is what makes that possible, and this is what proves it - without it,
+    # every conversion LibreOffice handles fails while pandoc's keeps working.
+    # Rich Text is the target because it keeps the document's text readable, so
+    # the marker can be asserted the same way as above.
+    - name: Open the ConvertX home page to start a second conversion job
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/"
+        method: GET
+        headers:
+          Cookie: "auth={{ convertx_auth_cookie }}"
+        follow_redirects: none
+        status_code: 200
+      register: convertx_home_libreoffice
+
+    - name: Remember the second conversion job
+      ansible.builtin.set_fact:
+        convertx_libreoffice_job_id: "{{ convertx_home_libreoffice.set_cookie | default('') | regex_search('jobId=([^;]+)', '\\1') | first | default('') }}"
+
+    - name: Upload a plain text file to ConvertX
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/upload"
+        method: POST
+        headers:
+          Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_libreoffice_job_id }}"
+        body_format: form-multipart
+        body:
+          file:
+            filename: "{{ convertx_molecule_libreoffice_input_name }}"
+            mime_type: text/plain
+            content: |
+              {{ convertx_molecule_marker }} written in plain text.
+        follow_redirects: none
+        status_code: 200
+
+    - name: Ask ConvertX to convert the file to Rich Text through LibreOffice
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/convert"
+        method: POST
+        headers:
+          Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_libreoffice_job_id }}"
+        body_format: form-urlencoded
+        body:
+          convert_to: rtf,libreoffice
+          file_names: '["{{ convertx_molecule_libreoffice_input_name }}"]'
+        follow_redirects: none
+        status_code: 302
+
+    - name: Wait for the LibreOffice conversion to finish (up to 5m)
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/results/{{ convertx_libreoffice_job_id }}"
+        method: GET
+        headers:
+          Cookie: "auth={{ convertx_auth_cookie }}"
+        follow_redirects: none
+        status_code: 200
+        return_content: true
+      register: convertx_libreoffice_results
+      until: "'<td>Done</td>' in convertx_libreoffice_results.content"
+      retries: 60
+      delay: 5
+
+    - name: Download the file LibreOffice converted
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/download/{{ convertx_jwt.stdout }}/{{ convertx_libreoffice_job_id }}/{{ convertx_molecule_libreoffice_output_name }}"
+        method: GET
+        headers:
+          Cookie: "auth={{ convertx_auth_cookie }}"
+        follow_redirects: none
+        status_code: 200
+        return_content: true
+      register: convertx_libreoffice_download
+
+    - name: Assert LibreOffice produced Rich Text from the uploaded file
+      ansible.builtin.assert:
+        that:
+          - convertx_molecule_marker in convertx_libreoffice_download.content
+          - convertx_libreoffice_download.content.startswith('{\\rtf1')
+        fail_msg: "the downloaded file is not this suite's input converted to Rich Text: {{ convertx_libreoffice_download.content | default('no content') | truncate(300) }}"
+        success_msg: LibreOffice converted the uploaded text to Rich Text and kept its content
 
     # ----------------------------------------------------------------------
     # The converted file is not world-readable

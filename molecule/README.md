@@ -55,7 +55,7 @@ The scenario therefore checks three things that can fail independently of each o
 
 - **the role's configuration reached the process** — the HS256 signature of the auth cookie ConvertX issues is recomputed against the `JWT_SECRET` the role rendered (with that variable unset, ConvertX signs with a `randomUUID()` it invents at boot), and `HTTP_ALLOWED` and `HIDE_HISTORY` are given non-default values whose effects are observed in the response headers and in the rendered page
 - **the running image is the version `defaults/main.yml` pins** — read both from the line the process prints at startup and from the container's own `dist/package.json`
-- **ConvertX actually converts** — a generated Markdown file carrying a marker is uploaded, converted to HTML through pandoc, downloaded, and required to contain both the marker and HTML structure that the input did not have
+- **ConvertX actually converts** — a generated file carrying a marker is uploaded, converted, downloaded, and required to contain both the marker and structure that the input did not have. This runs twice: through pandoc, a single binary that runs under any conditions, and through LibreOffice, which refuses to start unless it can create a user profile and so depends on `convertx_environment_variables_xdg_config_home` being right
 
 Negative controls surround those: the `/setup` redirect is asserted before an account exists and the `/login` redirect afterwards, unknown paths must return 404, `/register` must be refused, and the converted file must not be served to a request that carries no auth cookie.
 
