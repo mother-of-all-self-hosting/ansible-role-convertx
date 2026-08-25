@@ -156,6 +156,10 @@ Note that it is not available to restore the password if it is lost. In this cas
 
 ## Troubleshooting
 
+### Document conversions fail with "User installation could not be completed"
+
+The container runs unprivileged with a read-only root filesystem, and LibreOffice — which handles the Office, OpenDocument and other document formats — refuses to start unless it can create a user profile somewhere writable. `convertx_environment_variables_xdg_config_home` points it at the container's `/tmp` for that, and it defaults to a working value; the failure above means it was overridden with a directory the container cannot write to, or one whose parent does not exist (LibreOffice creates only the last path component).
+
 ### Check the service's logs
 
 You can find the logs in [systemd-journald](https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html) by logging in to the server with SSH and running `journalctl -fu convertx` (or how you/your playbook named the service, e.g. `mash-convertx`).

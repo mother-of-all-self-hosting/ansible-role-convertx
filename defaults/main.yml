@@ -224,6 +224,21 @@ convertx_container_cleanup_command: |
 # Specify the timezone
 convertx_environment_variables_tz: UTC
 
+# Specify the directory the bundled converters may keep their user profile in.
+#
+# The container runs unprivileged (`convertx_uid`) with a read-only root
+# filesystem, and the image has no home directory for that UID, so `$HOME`
+# resolves to `/`, which is not writable. LibreOffice refuses to start without
+# somewhere to create its user profile ("User installation could not be
+# completed"), which takes down every document conversion it handles - by
+# itself around 40 input and 20 output formats.
+#
+# This points at the tmpfs the role already mounts (see
+# `convertx_container_tmpfs_tmp_size`), so the profile is rebuilt on each start
+# and never lands on disk. It must be a directory that already exists, since
+# LibreOffice only creates the last path component.
+convertx_environment_variables_xdg_config_home: /tmp
+
 # Specify a long and secret string used to sign the JSON Web Token
 convertx_environment_variables_jwt_secret: ""
 
