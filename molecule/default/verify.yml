@@ -539,6 +539,6 @@
       ansible.builtin.debug:
         msg:
           - "ConvertX systemd: {{ convertx_service.status.ActiveState }}"
-          - "ConvertX version announced by the running process: {{ convertx_role_defaults.convertx_version }}"
+          - "ConvertX version: {{ convertx_role_defaults.convertx_version }}"
           - "ConvertX JWT_SECRET and HTTP_ALLOWED and HIDE_HISTORY: observed in the process"
           - "ConvertX conversion: {{ convertx_molecule_input_name }} -> {{ convertx_molecule_output_name }}, marker survived"
