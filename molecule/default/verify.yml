@@ -77,13 +77,13 @@
     # The service is up
     # ----------------------------------------------------------------------
 
-    # Loaded under a name of its own so that it cannot shadow the values this
-    # scenario tunes in its group_vars. Only leaf literals may be read from it;
-    # anything Jinja-derived would have no context to be rendered in here.
-    - name: Read the role's defaults
+    # The role is not included in this playbook, so its defaults are not in
+    # scope. Reading defaults/main.yml directly ties the version assertion
+    # below.
+    - name: Load the role defaults
       ansible.builtin.include_vars:
         file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
-        name: convertx_role_defaults
+        name: convertx_defaults
 
     - name: Wait for the ConvertX systemd service to become active
       ansible.builtin.systemd:
@@ -165,9 +165,9 @@
 
     - name: Assert ConvertX announced the pinned version
       ansible.builtin.assert:
-        that: ('ConvertX ' ~ convertx_role_defaults.convertx_version) in convertx_journal.stdout
-        fail_msg: "the journal does not contain 'ConvertX {{ convertx_role_defaults.convertx_version }}'"
-        success_msg: "ConvertX announced itself as {{ convertx_role_defaults.convertx_version }}"
+        that: ('ConvertX ' ~ convertx_defaults.convertx_version) in convertx_journal.stdout
+        fail_msg: "the journal does not contain 'ConvertX {{ convertx_defaults.convertx_version }}'"
+        success_msg: "ConvertX announced itself as {{ convertx_defaults.convertx_version }}"
 
     # Corroborated from the running container's own filesystem, because the
     # journal could in principle be carrying a line from an earlier image.
@@ -181,8 +181,8 @@
       ansible.builtin.assert:
         that: >-
           ((convertx_container_package_json.stdout | from_json)['version']) ==
-          (convertx_role_defaults.convertx_version | regex_replace('^v', ''))
-        fail_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] | default('none') }}, expected {{ convertx_role_defaults.convertx_version | regex_replace('^v', '') }}"
+          (convertx_defaults.convertx_version | regex_replace('^v', ''))
+        fail_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] | default('none') }}, expected {{ convertx_defaults.convertx_version | regex_replace('^v', '') }}"
         success_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] }}"
 
     # ----------------------------------------------------------------------
@@ -539,6 +539,6 @@
       ansible.builtin.debug:
         msg:
           - "ConvertX systemd: {{ convertx_service.status.ActiveState }}"
-          - "ConvertX version: {{ convertx_role_defaults.convertx_version }}"
+          - "ConvertX version: {{ convertx_defaults.convertx_version }}"
           - "ConvertX JWT_SECRET and HTTP_ALLOWED and HIDE_HISTORY: observed in the process"
           - "ConvertX conversion: {{ convertx_molecule_input_name }} -> {{ convertx_molecule_output_name }}, marker survived"
