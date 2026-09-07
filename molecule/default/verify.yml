@@ -119,38 +119,6 @@
       delay: 5
 
     # ----------------------------------------------------------------------
-    # Negative controls, taken before an account exists
-    # ----------------------------------------------------------------------
-
-    # An unconfigured ConvertX and a working one both answer `/` with a 302.
-    # They differ in where they send you: a service with no accounts yet offers
-    # its unauthenticated first-run form at `/setup`. Asserting on the target,
-    # here and again after registering, is what makes the later `/login`
-    # assertion mean something.
-    - name: Confirm ConvertX offers its first-run setup form while no account exists
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/"
-        method: GET
-        follow_redirects: none
-        status_code: 302
-      register: convertx_root_before_registration
-
-    - name: Assert ConvertX is in its first-run state
-      ansible.builtin.assert:
-        that: convertx_root_before_registration.location | urlsplit('path') == '/setup'
-        fail_msg: "expected / to redirect to /setup before registration, got {{ convertx_root_before_registration.location | default('no Location header') }}"
-        success_msg: / redirects to /setup, so ConvertX has no accounts yet
-
-    # Installer and wizard pages of other applications answer every path with a
-    # 200, which turns any probe that only looks at status codes into a no-op.
-    - name: Confirm ConvertX does not answer unknown paths
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/convertx-molecule-no-such-path"
-        method: GET
-        follow_redirects: none
-        status_code: 404
-
-    # ----------------------------------------------------------------------
     # The running image is the version the role pins
     # ----------------------------------------------------------------------
 
@@ -184,6 +152,38 @@
           (convertx_defaults.convertx_version | regex_replace('^v', ''))
         fail_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] | default('none') }}, expected {{ convertx_defaults.convertx_version | regex_replace('^v', '') }}"
         success_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] }}"
+
+    # ----------------------------------------------------------------------
+    # Negative controls, taken before an account exists
+    # ----------------------------------------------------------------------
+
+    # An unconfigured ConvertX and a working one both answer `/` with a 302.
+    # They differ in where they send you: a service with no accounts yet offers
+    # its unauthenticated first-run form at `/setup`. Asserting on the target,
+    # here and again after registering, is what makes the later `/login`
+    # assertion mean something.
+    - name: Confirm ConvertX offers its first-run setup form while no account exists
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/"
+        method: GET
+        follow_redirects: none
+        status_code: 302
+      register: convertx_root_before_registration
+
+    - name: Assert ConvertX is in its first-run state
+      ansible.builtin.assert:
+        that: convertx_root_before_registration.location | urlsplit('path') == '/setup'
+        fail_msg: "expected / to redirect to /setup before registration, got {{ convertx_root_before_registration.location | default('no Location header') }}"
+        success_msg: / redirects to /setup, so ConvertX has no accounts yet
+
+    # Installer and wizard pages of other applications answer every path with a
+    # 200, which turns any probe that only looks at status codes into a no-op.
+    - name: Confirm ConvertX does not answer unknown paths
+      ansible.builtin.uri:
+        url: "{{ convertx_molecule_base_url }}/convertx-molecule-no-such-path"
+        method: GET
+        follow_redirects: none
+        status_code: 404
 
     # ----------------------------------------------------------------------
     # Register an account through the first-run form
