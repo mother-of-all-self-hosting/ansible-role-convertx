@@ -86,22 +86,26 @@
         name: convertx_defaults
 
     - name: Wait for the ConvertX systemd service to become active
-      ansible.builtin.systemd:
+      ansible.builtin.systemd_service:
         name: convertx.service
       register: convertx_service
       until: convertx_service.status.ActiveState == 'active'
       retries: 36
       delay: 5
+      # So that giving up is reported by the assertion below rather than as a
+      # wall of systemd unit properties.
+      failed_when: false
 
-    # `Restart=always` would report `active` for a container that boots and
-    # dies every 30 seconds, so this is a gate and not a result.
+    # `Restart=always` in the systemd unit means that even a container which crashes
+    # and gets restarted reads as active here, so this is a precondition rather than
+    # a result.
     - name: Assert the ConvertX systemd service is active
       ansible.builtin.assert:
         that: convertx_service.status.ActiveState == 'active'
-        fail_msg: "convertx.service is {{ convertx_service.status.ActiveState }}, not active"
+        fail_msg: "convertx.service is not active ({{ convertx_service.status.ActiveState }})"
         success_msg: convertx.service is active
 
-    - name: Retrieve the ConvertX service log for debugging
+    - name: Retrieve the ConvertX systemd service log for debugging
       when: convertx_debug_service_enabled | bool
       ansible.builtin.command:
         cmd: journalctl -xeu convertx.service
