@@ -135,12 +135,6 @@
       register: convertx_journal
       changed_when: false
 
-    - name: Assert ConvertX announced the pinned version
-      ansible.builtin.assert:
-        that: ('ConvertX ' ~ convertx_defaults.convertx_version) in convertx_journal.stdout
-        fail_msg: "the journal does not contain 'ConvertX {{ convertx_defaults.convertx_version }}'"
-        success_msg: "ConvertX announced itself as {{ convertx_defaults.convertx_version }}"
-
     # Corroborated from the running container's own filesystem, because the
     # journal could in principle be carrying a line from an earlier image.
     - name: Read the version recorded in the running container
@@ -151,9 +145,9 @@
 
     - name: Assert the running ConvertX is the version this role installs
       ansible.builtin.assert:
-        that: >-
-          ((convertx_container_package_json.stdout | from_json)['version']) ==
-          (convertx_defaults.convertx_version | regex_replace('^v', ''))
+        that:
+          - ((convertx_container_package_json.stdout | from_json)['version']) == (convertx_defaults.convertx_version | regex_replace('^v', ''))
+          - ('ConvertX ' ~ convertx_defaults.convertx_version) in convertx_journal.stdout
         fail_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] | default('none') }}, expected {{ convertx_defaults.convertx_version | regex_replace('^v', '') }}"
         success_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] }}"
 
