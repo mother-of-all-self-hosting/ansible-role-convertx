@@ -85,7 +85,7 @@
         file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
         name: convertx_defaults
 
-    - name: Wait for the ConvertX systemd service to become active
+    - name: Wait for the ConvertX systemd service to become active (up to 180s)
       ansible.builtin.systemd_service:
         name: convertx.service
       register: convertx_service
