@@ -108,7 +108,7 @@
     - name: Retrieve the ConvertX systemd service log for debugging
       when: convertx_debug_service_enabled | bool
       ansible.builtin.command:
-        cmd: journalctl -xeu convertx.service
+        cmd: journalctl --no-pager --output=cat --unit=convertx.service
       changed_when: false
 
     - name: Wait for the ConvertX health endpoint to report ok (up to 10m)
@@ -131,7 +131,7 @@
     # label attached to the image by whoever built it.
     - name: Read the version ConvertX announced at startup
       ansible.builtin.command:
-        cmd: journalctl -u convertx.service --no-pager --output=cat
+        cmd: journalctl --no-pager --output=cat --unit=convertx.service
       register: convertx_journal
       changed_when: false
 
