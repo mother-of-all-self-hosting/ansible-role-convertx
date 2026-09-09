@@ -73,6 +73,8 @@
       sys.stdout.write(str(json.loads(decode(payload_b64))["id"]))
 
   tasks:
+    - name: Verify that ConvertX works
+      block:
     # ----------------------------------------------------------------------
     # The service is up
     # ----------------------------------------------------------------------
@@ -540,3 +542,19 @@
           - "ConvertX version: {{ convertx_defaults.convertx_version }}"
           - "ConvertX JWT_SECRET and HTTP_ALLOWED and HIDE_HISTORY: observed in the process"
           - "ConvertX conversion: {{ convertx_molecule_input_name }} -> {{ convertx_molecule_output_name }}, marker survived"
+
+      rescue:
+        # Whatever went wrong, the reason is almost always in the systemd service log.
+        - name: Retrieve the ConvertX systemd service log
+          ansible.builtin.command:
+            cmd: journalctl --no-pager --output=cat --unit=convertx.service
+          register: convertx_service_log
+          changed_when: false
+
+        - name: Show the ConvertX systemd service log
+          ansible.builtin.debug:
+            var: convertx_service_log.stdout_lines
+
+        - name: Fail because verification did not pass
+          ansible.builtin.fail:
+            msg: "ConvertX verification failed. The systemd service log is printed above."
