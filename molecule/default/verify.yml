@@ -75,473 +75,473 @@
   tasks:
     - name: Verify that ConvertX works
       block:
-    # ----------------------------------------------------------------------
-    # The service is up
-    # ----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # The service is up
+        # ----------------------------------------------------------------------
 
-    # The role is not included in this playbook, so its defaults are not in
-    # scope. Reading defaults/main.yml directly ties the version assertion
-    # below.
-    - name: Load the role defaults
-      ansible.builtin.include_vars:
-        file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
-        name: convertx_defaults
+        # The role is not included in this playbook, so its defaults are not in
+        # scope. Reading defaults/main.yml directly ties the version assertion
+        # below.
+        - name: Load the role defaults
+          ansible.builtin.include_vars:
+            file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
+            name: convertx_defaults
 
-    - name: Wait for the ConvertX systemd service to become active (up to 180s)
-      ansible.builtin.systemd_service:
-        name: convertx.service
-      register: convertx_service
-      until: convertx_service.status.ActiveState == 'active'
-      retries: 36
-      delay: 5
-      # So that giving up is reported by the assertion below rather than as a
-      # wall of systemd unit properties.
-      failed_when: false
+        - name: Wait for the ConvertX systemd service to become active (up to 180s)
+          ansible.builtin.systemd_service:
+            name: convertx.service
+          register: convertx_service
+          until: convertx_service.status.ActiveState == 'active'
+          retries: 36
+          delay: 5
+          # So that giving up is reported by the assertion below rather than as a
+          # wall of systemd unit properties.
+          failed_when: false
 
-    # `Restart=always` in the systemd unit means that even a container which crashes
-    # and gets restarted reads as active here, so this is a precondition rather than
-    # a result.
-    - name: Assert the ConvertX systemd service is active
-      ansible.builtin.assert:
-        that: convertx_service.status.ActiveState == 'active'
-        fail_msg: "convertx.service is not active ({{ convertx_service.status.ActiveState }})"
-        success_msg: convertx.service is active
+        # `Restart=always` in the systemd unit means that even a container which crashes
+        # and gets restarted reads as active here, so this is a precondition rather than
+        # a result.
+        - name: Assert the ConvertX systemd service is active
+          ansible.builtin.assert:
+            that: convertx_service.status.ActiveState == 'active'
+            fail_msg: "convertx.service is not active ({{ convertx_service.status.ActiveState }})"
+            success_msg: convertx.service is active
 
-    - name: Retrieve the ConvertX systemd service log for debugging
-      when: convertx_debug_service_enabled | bool
-      ansible.builtin.command:
-        cmd: journalctl --no-pager --output=cat --unit=convertx.service
-      changed_when: false
+        - name: Retrieve the ConvertX systemd service log for debugging
+          when: convertx_debug_service_enabled | bool
+          ansible.builtin.command:
+            cmd: journalctl --no-pager --output=cat --unit=convertx.service
+          changed_when: false
 
-    - name: Wait for the ConvertX health endpoint to report ok (up to 10m)
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/healthcheck"
-        method: GET
-        follow_redirects: none
-        return_content: true
-      register: convertx_healthcheck
-      until: convertx_healthcheck.status == 200 and convertx_healthcheck.json.status | default('') == 'ok'
-      retries: 120
-      delay: 5
+        - name: Wait for the ConvertX health endpoint to report ok (up to 10m)
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/healthcheck"
+            method: GET
+            follow_redirects: none
+            return_content: true
+          register: convertx_healthcheck
+          until: convertx_healthcheck.status == 200 and convertx_healthcheck.json.status | default('') == 'ok'
+          retries: 120
+          delay: 5
 
-    # ----------------------------------------------------------------------
-    # The running image is the version the role pins
-    # ----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # The running image is the version the role pins
+        # ----------------------------------------------------------------------
 
-    # ConvertX announces its own version on stdout at boot, which the systemd
-    # unit puts in the journal. This is the running process talking, not a
-    # label attached to the image by whoever built it.
-    - name: Read the version ConvertX announced at startup
-      ansible.builtin.command:
-        cmd: journalctl --no-pager --output=cat --unit=convertx.service
-      register: convertx_journal
-      changed_when: false
+        # ConvertX announces its own version on stdout at boot, which the systemd
+        # unit puts in the journal. This is the running process talking, not a
+        # label attached to the image by whoever built it.
+        - name: Read the version ConvertX announced at startup
+          ansible.builtin.command:
+            cmd: journalctl --no-pager --output=cat --unit=convertx.service
+          register: convertx_journal
+          changed_when: false
 
-    # Corroborated from the running container's own filesystem, because the
-    # journal could in principle be carrying a line from an earlier image.
-    - name: Read the version recorded in the running container
-      ansible.builtin.command:
-        cmd: docker exec convertx cat /app/dist/package.json
-      register: convertx_container_package_json
-      changed_when: false
+        # Corroborated from the running container's own filesystem, because the
+        # journal could in principle be carrying a line from an earlier image.
+        - name: Read the version recorded in the running container
+          ansible.builtin.command:
+            cmd: docker exec convertx cat /app/dist/package.json
+          register: convertx_container_package_json
+          changed_when: false
 
-    - name: Assert the running ConvertX is the version this role installs
-      ansible.builtin.assert:
-        that:
-          - ((convertx_container_package_json.stdout | from_json)['version']) == (convertx_defaults.convertx_version | regex_replace('^v', ''))
-          - ('ConvertX ' ~ convertx_defaults.convertx_version) in convertx_journal.stdout
-        fail_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] | default('none') }}, expected {{ convertx_defaults.convertx_version | regex_replace('^v', '') }}"
-        success_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] }}"
+        - name: Assert the running ConvertX is the version this role installs
+          ansible.builtin.assert:
+            that:
+              - ((convertx_container_package_json.stdout | from_json)['version']) == (convertx_defaults.convertx_version | regex_replace('^v', ''))
+              - ('ConvertX ' ~ convertx_defaults.convertx_version) in convertx_journal.stdout
+            fail_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] | default('none') }}, expected {{ convertx_defaults.convertx_version | regex_replace('^v', '') }}"
+            success_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] }}"
 
-    # ----------------------------------------------------------------------
-    # Negative controls, taken before an account exists
-    # ----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # Negative controls, taken before an account exists
+        # ----------------------------------------------------------------------
 
-    # An unconfigured ConvertX and a working one both answer `/` with a 302.
-    # They differ in where they send you: a service with no accounts yet offers
-    # its unauthenticated first-run form at `/setup`. Asserting on the target,
-    # here and again after registering, is what makes the later `/login`
-    # assertion mean something.
-    - name: Confirm ConvertX offers its first-run setup form while no account exists
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/"
-        method: GET
-        follow_redirects: none
-        status_code: 302
-      register: convertx_root_before_registration
+        # An unconfigured ConvertX and a working one both answer `/` with a 302.
+        # They differ in where they send you: a service with no accounts yet offers
+        # its unauthenticated first-run form at `/setup`. Asserting on the target,
+        # here and again after registering, is what makes the later `/login`
+        # assertion mean something.
+        - name: Confirm ConvertX offers its first-run setup form while no account exists
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/"
+            method: GET
+            follow_redirects: none
+            status_code: 302
+          register: convertx_root_before_registration
 
-    - name: Assert ConvertX is in its first-run state
-      ansible.builtin.assert:
-        that: convertx_root_before_registration.location | urlsplit('path') == '/setup'
-        fail_msg: "expected / to redirect to /setup before registration, got {{ convertx_root_before_registration.location | default('no Location header') }}"
-        success_msg: / redirects to /setup, so ConvertX has no accounts yet
+        - name: Assert ConvertX is in its first-run state
+          ansible.builtin.assert:
+            that: convertx_root_before_registration.location | urlsplit('path') == '/setup'
+            fail_msg: "expected / to redirect to /setup before registration, got {{ convertx_root_before_registration.location | default('no Location header') }}"
+            success_msg: / redirects to /setup, so ConvertX has no accounts yet
 
-    # Installer and wizard pages of other applications answer every path with a
-    # 200, which turns any probe that only looks at status codes into a no-op.
-    - name: Confirm ConvertX does not answer unknown paths
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/convertx-molecule-no-such-path"
-        method: GET
-        follow_redirects: none
-        status_code: 404
+        # Installer and wizard pages of other applications answer every path with a
+        # 200, which turns any probe that only looks at status codes into a no-op.
+        - name: Confirm ConvertX does not answer unknown paths
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/convertx-molecule-no-such-path"
+            method: GET
+            follow_redirects: none
+            status_code: 404
 
-    # ----------------------------------------------------------------------
-    # Register an account through the first-run form
-    # ----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # Register an account through the first-run form
+        # ----------------------------------------------------------------------
 
-    - name: Register the ConvertX account used by this suite
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/register"
-        method: POST
-        body_format: form-urlencoded
-        body:
-          email: "{{ convertx_molecule_account_email }}"
-          password: "{{ convertx_molecule_account_password }}"
-        follow_redirects: none
-        status_code: 302
-      register: convertx_register
+        - name: Register the ConvertX account used by this suite
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/register"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              email: "{{ convertx_molecule_account_email }}"
+              password: "{{ convertx_molecule_account_password }}"
+            follow_redirects: none
+            status_code: 302
+          register: convertx_register
 
-    # The uri module does not fill in `cookies` when it is told not to follow
-    # redirects, so the token is taken out of the raw Set-Cookie header.
-    - name: Remember the auth cookie ConvertX issued
-      ansible.builtin.set_fact:
-        convertx_auth_cookie: "{{ convertx_register.set_cookie | default('') | regex_search('auth=([^;]+)', '\\1') | first | default('') }}"
+        # The uri module does not fill in `cookies` when it is told not to follow
+        # redirects, so the token is taken out of the raw Set-Cookie header.
+        - name: Remember the auth cookie ConvertX issued
+          ansible.builtin.set_fact:
+            convertx_auth_cookie: "{{ convertx_register.set_cookie | default('') | regex_search('auth=([^;]+)', '\\1') | first | default('') }}"
 
-    - name: Assert registration issued an auth cookie
-      ansible.builtin.assert:
-        that:
-          - convertx_auth_cookie | length > 0
-          - convertx_auth_cookie.split('.') | length == 3
-        fail_msg: "registration did not set an auth cookie: {{ convertx_register.set_cookie | default('no Set-Cookie header') }}"
-        success_msg: registration issued an auth cookie
+        - name: Assert registration issued an auth cookie
+          ansible.builtin.assert:
+            that:
+              - convertx_auth_cookie | length > 0
+              - convertx_auth_cookie.split('.') | length == 3
+            fail_msg: "registration did not set an auth cookie: {{ convertx_register.set_cookie | default('no Set-Cookie header') }}"
+            success_msg: registration issued an auth cookie
 
-    # ----------------------------------------------------------------------
-    # The role's configuration reached the process
-    # ----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # The role's configuration reached the process
+        # ----------------------------------------------------------------------
 
-    # `convertx_environment_variables_http_allowed` is false by default, both
-    # in this role and in ConvertX itself, and the scenario sets it to true.
-    # ConvertX only drops `Secure` from its cookies when it has seen the
-    # variable, so an env file that never arrived shows up here.
-    - name: Assert HTTP_ALLOWED reached the process
-      ansible.builtin.assert:
-        that:
-          - convertx_register.set_cookie is defined
-          - "'auth=' in convertx_register.set_cookie"
-          - "'Secure' not in convertx_register.set_cookie"
-        fail_msg: "the auth cookie is marked Secure, so HTTP_ALLOWED did not reach the process: {{ convertx_register.set_cookie | default('no Set-Cookie header') }}"
-        success_msg: the auth cookie is not marked Secure, as HTTP_ALLOWED=true requires
+        # `convertx_environment_variables_http_allowed` is false by default, both
+        # in this role and in ConvertX itself, and the scenario sets it to true.
+        # ConvertX only drops `Secure` from its cookies when it has seen the
+        # variable, so an env file that never arrived shows up here.
+        - name: Assert HTTP_ALLOWED reached the process
+          ansible.builtin.assert:
+            that:
+              - convertx_register.set_cookie is defined
+              - "'auth=' in convertx_register.set_cookie"
+              - "'Secure' not in convertx_register.set_cookie"
+            fail_msg: "the auth cookie is marked Secure, so HTTP_ALLOWED did not reach the process: {{ convertx_register.set_cookie | default('no Set-Cookie header') }}"
+            success_msg: the auth cookie is not marked Secure, as HTTP_ALLOWED=true requires
 
-    # With JWT_SECRET unset, ConvertX signs its tokens with a randomUUID() it
-    # generates at boot. A token that verifies against the value in the
-    # scenario's group_vars can only have been signed by a process that read
-    # the `env` file this role rendered.
-    - name: Verify the auth JWT against the configured JWT_SECRET
-      ansible.builtin.command:
-        argv:
-          - python3
-          - -c
-          - "{{ convertx_molecule_jwt_verifier }}"
-          - "{{ convertx_auth_cookie }}"
-          - "{{ convertx_environment_variables_jwt_secret }}"
-      register: convertx_jwt
-      changed_when: false
+        # With JWT_SECRET unset, ConvertX signs its tokens with a randomUUID() it
+        # generates at boot. A token that verifies against the value in the
+        # scenario's group_vars can only have been signed by a process that read
+        # the `env` file this role rendered.
+        - name: Verify the auth JWT against the configured JWT_SECRET
+          ansible.builtin.command:
+            argv:
+              - python3
+              - -c
+              - "{{ convertx_molecule_jwt_verifier }}"
+              - "{{ convertx_auth_cookie }}"
+              - "{{ convertx_environment_variables_jwt_secret }}"
+          register: convertx_jwt
+          changed_when: false
 
-    - name: Assert the JWT identifies a user
-      ansible.builtin.assert:
-        that: convertx_jwt.stdout | int > 0
-        fail_msg: "the verified JWT carries no usable user id ({{ convertx_jwt.stdout }})"
-        success_msg: "the auth JWT is signed with the role's JWT_SECRET and identifies user {{ convertx_jwt.stdout }}"
+        - name: Assert the JWT identifies a user
+          ansible.builtin.assert:
+            that: convertx_jwt.stdout | int > 0
+            fail_msg: "the verified JWT carries no usable user id ({{ convertx_jwt.stdout }})"
+            success_msg: "the auth JWT is signed with the role's JWT_SECRET and identifies user {{ convertx_jwt.stdout }}"
 
-    # ----------------------------------------------------------------------
-    # Negative controls, taken now that an account exists
-    # ----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # Negative controls, taken now that an account exists
+        # ----------------------------------------------------------------------
 
-    - name: Confirm the ConvertX first-run window has closed
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/"
-        method: GET
-        follow_redirects: none
-        status_code: 302
-      register: convertx_root_after_registration
+        - name: Confirm the ConvertX first-run window has closed
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/"
+            method: GET
+            follow_redirects: none
+            status_code: 302
+          register: convertx_root_after_registration
 
-    - name: Assert unauthenticated visitors are sent to the login page
-      ansible.builtin.assert:
-        that: convertx_root_after_registration.location | urlsplit('path') == '/login'
-        fail_msg: "expected / to redirect to /login once an account exists, got {{ convertx_root_after_registration.location | default('no Location header') }}"
-        success_msg: / redirects to /login, so the unauthenticated setup form is gone
+        - name: Assert unauthenticated visitors are sent to the login page
+          ansible.builtin.assert:
+            that: convertx_root_after_registration.location | urlsplit('path') == '/login'
+            fail_msg: "expected / to redirect to /login once an account exists, got {{ convertx_root_after_registration.location | default('no Location header') }}"
+            success_msg: / redirects to /login, so the unauthenticated setup form is gone
 
-    - name: Confirm ConvertX refuses registration
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/register"
-        method: GET
-        follow_redirects: none
-        status_code: 302
-      register: convertx_registration_page
+        - name: Confirm ConvertX refuses registration
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/register"
+            method: GET
+            follow_redirects: none
+            status_code: 302
+          register: convertx_registration_page
 
-    - name: Assert account registration is disabled
-      ansible.builtin.assert:
-        that: convertx_registration_page.location | urlsplit('path') == '/login'
-        fail_msg: "expected /register to redirect to /login, got {{ convertx_registration_page.location | default('no Location header') }}"
-        success_msg: /register is refused, as ACCOUNT_REGISTRATION=false requires
+        - name: Assert account registration is disabled
+          ansible.builtin.assert:
+            that: convertx_registration_page.location | urlsplit('path') == '/login'
+            fail_msg: "expected /register to redirect to /login, got {{ convertx_registration_page.location | default('no Location header') }}"
+            success_msg: /register is refused, as ACCOUNT_REGISTRATION=false requires
 
-    # ----------------------------------------------------------------------
-    # Convert a file, end to end
-    # ----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # Convert a file, end to end
+        # ----------------------------------------------------------------------
 
-    # ConvertX ties uploads to a job, and creates that job when a signed-in
-    # browser loads the home page. The response also carries the header this
-    # suite reads HIDE_HISTORY out of.
-    - name: Open the ConvertX home page to start a conversion job
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/"
-        method: GET
-        headers:
-          Cookie: "auth={{ convertx_auth_cookie }}"
-        follow_redirects: none
-        status_code: 200
-        return_content: true
-      register: convertx_home
+        # ConvertX ties uploads to a job, and creates that job when a signed-in
+        # browser loads the home page. The response also carries the header this
+        # suite reads HIDE_HISTORY out of.
+        - name: Open the ConvertX home page to start a conversion job
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/"
+            method: GET
+            headers:
+              Cookie: "auth={{ convertx_auth_cookie }}"
+            follow_redirects: none
+            status_code: 200
+            return_content: true
+          register: convertx_home
 
-    - name: Remember the conversion job ConvertX started
-      ansible.builtin.set_fact:
-        convertx_job_id: "{{ convertx_home.set_cookie | default('') | regex_search('jobId=([^;]+)', '\\1') | first | default('') }}"
+        - name: Remember the conversion job ConvertX started
+          ansible.builtin.set_fact:
+            convertx_job_id: "{{ convertx_home.set_cookie | default('') | regex_search('jobId=([^;]+)', '\\1') | first | default('') }}"
 
-    - name: Assert a conversion job was started
-      ansible.builtin.assert:
-        that: convertx_job_id | int > 0
-        fail_msg: "the home page did not hand out a jobId cookie: {{ convertx_home.set_cookie | default('no Set-Cookie header') }}"
-        success_msg: "conversion job {{ convertx_job_id }} was started"
+        - name: Assert a conversion job was started
+          ansible.builtin.assert:
+            that: convertx_job_id | int > 0
+            fail_msg: "the home page did not hand out a jobId cookie: {{ convertx_home.set_cookie | default('no Set-Cookie header') }}"
+            success_msg: "conversion job {{ convertx_job_id }} was started"
 
-    # `convertx_environment_variables_hide_history` is false by default and the
-    # scenario sets it to true. ConvertX renders the signed-in header from that
-    # value, so the History link disappearing while the Account link stays is
-    # the role's own setting being observed. Checking that the Account link is
-    # still there keeps the assertion from passing on an empty page.
-    - name: Assert HIDE_HISTORY reached the process
-      ansible.builtin.assert:
-        that:
-          - "'\"/account\"' in convertx_home.content"
-          - "'\"/history\"' not in convertx_home.content"
-        fail_msg: the signed-in header still links to /history, so HIDE_HISTORY did not reach the process
-        success_msg: the signed-in header omits /history, as HIDE_HISTORY=true requires
+        # `convertx_environment_variables_hide_history` is false by default and the
+        # scenario sets it to true. ConvertX renders the signed-in header from that
+        # value, so the History link disappearing while the Account link stays is
+        # the role's own setting being observed. Checking that the Account link is
+        # still there keeps the assertion from passing on an empty page.
+        - name: Assert HIDE_HISTORY reached the process
+          ansible.builtin.assert:
+            that:
+              - "'\"/account\"' in convertx_home.content"
+              - "'\"/history\"' not in convertx_home.content"
+            fail_msg: the signed-in header still links to /history, so HIDE_HISTORY did not reach the process
+            success_msg: the signed-in header omits /history, as HIDE_HISTORY=true requires
 
-    # Markdown carrying a marker, converted to HTML. The marker has to come out
-    # the other side, and it has to come out inside HTML structure that the
-    # input did not have - a service that merely handed the upload back would
-    # satisfy the marker on its own.
-    #
-    # The part is given as `content` rather than as a path, for two reasons.
-    # The uri module resolves a multipart `filename` on the controller and
-    # ships the file to the target, so a file generated here would not be
-    # found; and a part given as a path is base64-encoded, with a
-    # Content-Transfer-Encoding header that HTTP multipart does not act on, so
-    # ConvertX would store the base64 text as the file. That conversion still
-    # succeeds and still returns well-formed HTML - holding the base64 instead
-    # of the document. Nothing but the marker assertion below would notice.
-    - name: Upload the file to ConvertX
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/upload"
-        method: POST
-        headers:
-          Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_job_id }}"
-        body_format: form-multipart
-        body:
-          file:
-            filename: "{{ convertx_molecule_input_name }}"
-            mime_type: text/markdown
-            content: |
-              # Heading {{ convertx_molecule_marker }}
+        # Markdown carrying a marker, converted to HTML. The marker has to come out
+        # the other side, and it has to come out inside HTML structure that the
+        # input did not have - a service that merely handed the upload back would
+        # satisfy the marker on its own.
+        #
+        # The part is given as `content` rather than as a path, for two reasons.
+        # The uri module resolves a multipart `filename` on the controller and
+        # ships the file to the target, so a file generated here would not be
+        # found; and a part given as a path is base64-encoded, with a
+        # Content-Transfer-Encoding header that HTTP multipart does not act on, so
+        # ConvertX would store the base64 text as the file. That conversion still
+        # succeeds and still returns well-formed HTML - holding the base64 instead
+        # of the document. Nothing but the marker assertion below would notice.
+        - name: Upload the file to ConvertX
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/upload"
+            method: POST
+            headers:
+              Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_job_id }}"
+            body_format: form-multipart
+            body:
+              file:
+                filename: "{{ convertx_molecule_input_name }}"
+                mime_type: text/markdown
+                content: |
+                  # Heading {{ convertx_molecule_marker }}
 
-              Body paragraph containing {{ convertx_molecule_marker }} here.
-        follow_redirects: none
-        status_code: 200
-      register: convertx_upload
+                  Body paragraph containing {{ convertx_molecule_marker }} here.
+            follow_redirects: none
+            status_code: 200
+          register: convertx_upload
 
-    - name: Assert the upload was accepted
-      ansible.builtin.assert:
-        that: convertx_upload.json.message | default('') == 'Files uploaded successfully.'
-        fail_msg: "ConvertX did not accept the upload: {{ convertx_upload.json | default(convertx_upload.content | default('no response')) }}"
-        success_msg: ConvertX accepted the upload
+        - name: Assert the upload was accepted
+          ansible.builtin.assert:
+            that: convertx_upload.json.message | default('') == 'Files uploaded successfully.'
+            fail_msg: "ConvertX did not accept the upload: {{ convertx_upload.json | default(convertx_upload.content | default('no response')) }}"
+            success_msg: ConvertX accepted the upload
 
-    # `convert_to` is `<target format>,<converter>`; pandoc is one of the
-    # converters the image ships, and markdown to HTML is the cheapest
-    # conversion that visibly restructures its input.
-    - name: Ask ConvertX to convert the file from Markdown to HTML
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/convert"
-        method: POST
-        headers:
-          Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_job_id }}"
-        body_format: form-urlencoded
-        body:
-          convert_to: html,pandoc
-          file_names: '["{{ convertx_molecule_input_name }}"]'
-        follow_redirects: none
-        status_code: 302
-      register: convertx_convert
+        # `convert_to` is `<target format>,<converter>`; pandoc is one of the
+        # converters the image ships, and markdown to HTML is the cheapest
+        # conversion that visibly restructures its input.
+        - name: Ask ConvertX to convert the file from Markdown to HTML
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/convert"
+            method: POST
+            headers:
+              Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_job_id }}"
+            body_format: form-urlencoded
+            body:
+              convert_to: html,pandoc
+              file_names: '["{{ convertx_molecule_input_name }}"]'
+            follow_redirects: none
+            status_code: 302
+          register: convertx_convert
 
-    - name: Assert the conversion was queued
-      ansible.builtin.assert:
-        that: convertx_convert.location | urlsplit('path') == '/results/' ~ convertx_job_id
-        fail_msg: "ConvertX did not queue the conversion, it redirected to {{ convertx_convert.location | default('nowhere') }}"
-        success_msg: the conversion was queued
+        - name: Assert the conversion was queued
+          ansible.builtin.assert:
+            that: convertx_convert.location | urlsplit('path') == '/results/' ~ convertx_job_id
+            fail_msg: "ConvertX did not queue the conversion, it redirected to {{ convertx_convert.location | default('nowhere') }}"
+            success_msg: the conversion was queued
 
-    # ConvertX converts in the background and only writes the result row once
-    # the converter has resolved, so a conversion that fails never reaches
-    # `Done` and this task is where the suite stops.
-    - name: Wait for the conversion to finish (up to 5m)
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/results/{{ convertx_job_id }}"
-        method: GET
-        headers:
-          Cookie: "auth={{ convertx_auth_cookie }}"
-        follow_redirects: none
-        status_code: 200
-        return_content: true
-      register: convertx_results
-      until: "'<td>Done</td>' in convertx_results.content"
-      retries: 60
-      delay: 5
+        # ConvertX converts in the background and only writes the result row once
+        # the converter has resolved, so a conversion that fails never reaches
+        # `Done` and this task is where the suite stops.
+        - name: Wait for the conversion to finish (up to 5m)
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/results/{{ convertx_job_id }}"
+            method: GET
+            headers:
+              Cookie: "auth={{ convertx_auth_cookie }}"
+            follow_redirects: none
+            status_code: 200
+            return_content: true
+          register: convertx_results
+          until: "'<td>Done</td>' in convertx_results.content"
+          retries: 60
+          delay: 5
 
-    - name: Download the converted file
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/download/{{ convertx_jwt.stdout }}/{{ convertx_job_id }}/{{ convertx_molecule_output_name }}"
-        method: GET
-        headers:
-          Cookie: "auth={{ convertx_auth_cookie }}"
-        follow_redirects: none
-        status_code: 200
-        return_content: true
-      register: convertx_download
+        - name: Download the converted file
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/download/{{ convertx_jwt.stdout }}/{{ convertx_job_id }}/{{ convertx_molecule_output_name }}"
+            method: GET
+            headers:
+              Cookie: "auth={{ convertx_auth_cookie }}"
+            follow_redirects: none
+            status_code: 200
+            return_content: true
+          register: convertx_download
 
-    # The marker proves the output was made from this suite's input; the HTML
-    # structure proves the file was converted rather than handed back; the
-    # absence of the Markdown heading syntax proves the input was consumed.
-    - name: Assert the downloaded file is the converted input
-      ansible.builtin.assert:
-        that:
-          - convertx_molecule_marker in convertx_download.content
-          - "'<h1' in convertx_download.content"
-          - "'</p>' in convertx_download.content"
-          - "'# Heading' not in convertx_download.content"
-        fail_msg: "the downloaded file is not this suite's input converted to HTML: {{ convertx_download.content | default('no content') | truncate(300) }}"
-        success_msg: ConvertX converted the uploaded Markdown to HTML and kept its content
+        # The marker proves the output was made from this suite's input; the HTML
+        # structure proves the file was converted rather than handed back; the
+        # absence of the Markdown heading syntax proves the input was consumed.
+        - name: Assert the downloaded file is the converted input
+          ansible.builtin.assert:
+            that:
+              - convertx_molecule_marker in convertx_download.content
+              - "'<h1' in convertx_download.content"
+              - "'</p>' in convertx_download.content"
+              - "'# Heading' not in convertx_download.content"
+            fail_msg: "the downloaded file is not this suite's input converted to HTML: {{ convertx_download.content | default('no content') | truncate(300) }}"
+            success_msg: ConvertX converted the uploaded Markdown to HTML and kept its content
 
-    # ----------------------------------------------------------------------
-    # Convert through LibreOffice too
-    # ----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # Convert through LibreOffice too
+        # ----------------------------------------------------------------------
 
-    # pandoc is a single self-contained binary and runs under any conditions.
-    # LibreOffice does not: it refuses to start unless it can create a user
-    # profile, and the container gives it a read-only root filesystem and a UID
-    # with no home directory. `convertx_environment_variables_xdg_config_home`
-    # is what makes that possible, and this is what proves it - without it,
-    # every conversion LibreOffice handles fails while pandoc's keeps working.
-    # Rich Text is the target because it keeps the document's text readable, so
-    # the marker can be asserted the same way as above.
-    - name: Open the ConvertX home page to start a second conversion job
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/"
-        method: GET
-        headers:
-          Cookie: "auth={{ convertx_auth_cookie }}"
-        follow_redirects: none
-        status_code: 200
-      register: convertx_home_libreoffice
+        # pandoc is a single self-contained binary and runs under any conditions.
+        # LibreOffice does not: it refuses to start unless it can create a user
+        # profile, and the container gives it a read-only root filesystem and a UID
+        # with no home directory. `convertx_environment_variables_xdg_config_home`
+        # is what makes that possible, and this is what proves it - without it,
+        # every conversion LibreOffice handles fails while pandoc's keeps working.
+        # Rich Text is the target because it keeps the document's text readable, so
+        # the marker can be asserted the same way as above.
+        - name: Open the ConvertX home page to start a second conversion job
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/"
+            method: GET
+            headers:
+              Cookie: "auth={{ convertx_auth_cookie }}"
+            follow_redirects: none
+            status_code: 200
+          register: convertx_home_libreoffice
 
-    - name: Remember the second conversion job
-      ansible.builtin.set_fact:
-        convertx_libreoffice_job_id: "{{ convertx_home_libreoffice.set_cookie | default('') | regex_search('jobId=([^;]+)', '\\1') | first | default('') }}"
+        - name: Remember the second conversion job
+          ansible.builtin.set_fact:
+            convertx_libreoffice_job_id: "{{ convertx_home_libreoffice.set_cookie | default('') | regex_search('jobId=([^;]+)', '\\1') | first | default('') }}"
 
-    - name: Upload a plain text file to ConvertX
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/upload"
-        method: POST
-        headers:
-          Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_libreoffice_job_id }}"
-        body_format: form-multipart
-        body:
-          file:
-            filename: "{{ convertx_molecule_libreoffice_input_name }}"
-            mime_type: text/plain
-            content: |
-              {{ convertx_molecule_marker }} written in plain text.
-        follow_redirects: none
-        status_code: 200
+        - name: Upload a plain text file to ConvertX
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/upload"
+            method: POST
+            headers:
+              Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_libreoffice_job_id }}"
+            body_format: form-multipart
+            body:
+              file:
+                filename: "{{ convertx_molecule_libreoffice_input_name }}"
+                mime_type: text/plain
+                content: |
+                  {{ convertx_molecule_marker }} written in plain text.
+            follow_redirects: none
+            status_code: 200
 
-    - name: Ask ConvertX to convert the file to Rich Text through LibreOffice
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/convert"
-        method: POST
-        headers:
-          Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_libreoffice_job_id }}"
-        body_format: form-urlencoded
-        body:
-          convert_to: rtf,libreoffice
-          file_names: '["{{ convertx_molecule_libreoffice_input_name }}"]'
-        follow_redirects: none
-        status_code: 302
+        - name: Ask ConvertX to convert the file to Rich Text through LibreOffice
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/convert"
+            method: POST
+            headers:
+              Cookie: "auth={{ convertx_auth_cookie }}; jobId={{ convertx_libreoffice_job_id }}"
+            body_format: form-urlencoded
+            body:
+              convert_to: rtf,libreoffice
+              file_names: '["{{ convertx_molecule_libreoffice_input_name }}"]'
+            follow_redirects: none
+            status_code: 302
 
-    - name: Wait for the LibreOffice conversion to finish (up to 5m)
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/results/{{ convertx_libreoffice_job_id }}"
-        method: GET
-        headers:
-          Cookie: "auth={{ convertx_auth_cookie }}"
-        follow_redirects: none
-        status_code: 200
-        return_content: true
-      register: convertx_libreoffice_results
-      until: "'<td>Done</td>' in convertx_libreoffice_results.content"
-      retries: 60
-      delay: 5
+        - name: Wait for the LibreOffice conversion to finish (up to 5m)
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/results/{{ convertx_libreoffice_job_id }}"
+            method: GET
+            headers:
+              Cookie: "auth={{ convertx_auth_cookie }}"
+            follow_redirects: none
+            status_code: 200
+            return_content: true
+          register: convertx_libreoffice_results
+          until: "'<td>Done</td>' in convertx_libreoffice_results.content"
+          retries: 60
+          delay: 5
 
-    - name: Download the file LibreOffice converted
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/download/{{ convertx_jwt.stdout }}/{{ convertx_libreoffice_job_id }}/{{ convertx_molecule_libreoffice_output_name }}"
-        method: GET
-        headers:
-          Cookie: "auth={{ convertx_auth_cookie }}"
-        follow_redirects: none
-        status_code: 200
-        return_content: true
-      register: convertx_libreoffice_download
+        - name: Download the file LibreOffice converted
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/download/{{ convertx_jwt.stdout }}/{{ convertx_libreoffice_job_id }}/{{ convertx_molecule_libreoffice_output_name }}"
+            method: GET
+            headers:
+              Cookie: "auth={{ convertx_auth_cookie }}"
+            follow_redirects: none
+            status_code: 200
+            return_content: true
+          register: convertx_libreoffice_download
 
-    - name: Assert LibreOffice produced Rich Text from the uploaded file
-      ansible.builtin.assert:
-        that:
-          - convertx_molecule_marker in convertx_libreoffice_download.content
-          - convertx_libreoffice_download.content.startswith('{\\rtf1')
-        fail_msg: "the downloaded file is not this suite's input converted to Rich Text: {{ convertx_libreoffice_download.content | default('no content') | truncate(300) }}"
-        success_msg: LibreOffice converted the uploaded text to Rich Text and kept its content
+        - name: Assert LibreOffice produced Rich Text from the uploaded file
+          ansible.builtin.assert:
+            that:
+              - convertx_molecule_marker in convertx_libreoffice_download.content
+              - convertx_libreoffice_download.content.startswith('{\\rtf1')
+            fail_msg: "the downloaded file is not this suite's input converted to Rich Text: {{ convertx_libreoffice_download.content | default('no content') | truncate(300) }}"
+            success_msg: LibreOffice converted the uploaded text to Rich Text and kept its content
 
-    # ----------------------------------------------------------------------
-    # The converted file is not world-readable
-    # ----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # The converted file is not world-readable
+        # ----------------------------------------------------------------------
 
-    - name: Confirm the converted file cannot be downloaded without the auth cookie
-      ansible.builtin.uri:
-        url: "{{ convertx_molecule_base_url }}/download/{{ convertx_jwt.stdout }}/{{ convertx_job_id }}/{{ convertx_molecule_output_name }}"
-        method: GET
-        follow_redirects: none
-        status_code: [401, 403, 422]
-        return_content: true
-      register: convertx_download_unauthenticated
+        - name: Confirm the converted file cannot be downloaded without the auth cookie
+          ansible.builtin.uri:
+            url: "{{ convertx_molecule_base_url }}/download/{{ convertx_jwt.stdout }}/{{ convertx_job_id }}/{{ convertx_molecule_output_name }}"
+            method: GET
+            follow_redirects: none
+            status_code: [401, 403, 422]
+            return_content: true
+          register: convertx_download_unauthenticated
 
-    - name: Assert the unauthenticated download returned nothing of ours
-      ansible.builtin.assert:
-        that: convertx_molecule_marker not in (convertx_download_unauthenticated.content | default(''))
-        fail_msg: an unauthenticated request was served the converted file
-        success_msg: "the converted file is refused without the auth cookie (HTTP {{ convertx_download_unauthenticated.status }})"
+        - name: Assert the unauthenticated download returned nothing of ours
+          ansible.builtin.assert:
+            that: convertx_molecule_marker not in (convertx_download_unauthenticated.content | default(''))
+            fail_msg: an unauthenticated request was served the converted file
+            success_msg: "the converted file is refused without the auth cookie (HTTP {{ convertx_download_unauthenticated.status }})"
 
-    - name: Show the ConvertX verification summary
-      ansible.builtin.debug:
-        msg:
-          - "ConvertX systemd: {{ convertx_service.status.ActiveState }}"
-          - "ConvertX version: {{ convertx_defaults.convertx_version }}"
-          - "ConvertX JWT_SECRET and HTTP_ALLOWED and HIDE_HISTORY: observed in the process"
-          - "ConvertX conversion: {{ convertx_molecule_input_name }} -> {{ convertx_molecule_output_name }}, marker survived"
+        - name: Show the ConvertX verification summary
+          ansible.builtin.debug:
+            msg:
+              - "ConvertX systemd: {{ convertx_service.status.ActiveState }}"
+              - "ConvertX version: {{ convertx_defaults.convertx_version }}"
+              - "ConvertX JWT_SECRET and HTTP_ALLOWED and HIDE_HISTORY: observed in the process"
+              - "ConvertX conversion: {{ convertx_molecule_input_name }} -> {{ convertx_molecule_output_name }}, marker survived"
 
       rescue:
         # Whatever went wrong, the reason is almost always in the systemd service log.
