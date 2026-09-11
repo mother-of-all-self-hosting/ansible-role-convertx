@@ -72,6 +72,9 @@
 
       sys.stdout.write(str(json.loads(decode(payload_b64))["id"]))
 
+    convertx_verify_units:
+      - convertx.service
+
   tasks:
     - name: Verify that ConvertX works
       block:
@@ -87,13 +90,14 @@
             file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
             name: convertx_defaults
 
-        - name: Wait for the ConvertX systemd service to become active (up to 180s)
+        - name: Wait for the ConvertX systemd services to become active (up to 180s each)
           ansible.builtin.systemd_service:
-            name: convertx.service
-          register: convertx_service
-          until: convertx_service.status.ActiveState == 'active'
+            name: "{{ item }}"
+          register: convertx_services
+          until: convertx_services.status.ActiveState == 'active'
           retries: 36
           delay: 5
+          loop: "{{ convertx_verify_units }}"
           # So that giving up is reported by the assertion below rather than as a
           # wall of systemd unit properties.
           failed_when: false
@@ -101,17 +105,20 @@
         # `Restart=always` in the systemd unit means that even a container which crashes
         # and gets restarted reads as active here, so this is a precondition rather than
         # a result.
-        - name: Assert the ConvertX systemd service is active
+        - name: Assert the ConvertX systemd services are active
           ansible.builtin.assert:
-            that: convertx_service.status.ActiveState == 'active'
-            fail_msg: "convertx.service is not active ({{ convertx_service.status.ActiveState }})"
-            success_msg: convertx.service is active
+            that: convertx_services.results | map(attribute='status.ActiveState') | unique | list == ['active']
+            fail_msg: >-
+              Not every service is active:
+              {{ dict(convertx_verify_units | zip(convertx_services.results | map(attribute='status.ActiveState'))) }}
+            success_msg: "Every systemd service is active"
 
-        - name: Retrieve the ConvertX systemd service log for debugging
+        - name: Retrieve the ConvertX systemd services log for debugging
           when: convertx_debug_service_enabled | bool
           ansible.builtin.command:
-            cmd: journalctl --no-pager --output=cat --unit=convertx.service
+            cmd: "journalctl --no-pager --output=cat --unit={{ item }}"
           changed_when: false
+          loop: "{{ convertx_verify_units }}"
 
         - name: Wait for the ConvertX health endpoint to report ok (up to 10m)
           ansible.builtin.uri:
@@ -538,7 +545,7 @@
         - name: Show the ConvertX verification summary
           ansible.builtin.debug:
             msg:
-              - "ConvertX systemd: {{ convertx_service.status.ActiveState }}"
+              - "ConvertX systemd: {% for unit, state in convertx_verify_units | zip(convertx_services.results | map(attribute='status.ActiveState')) %}{{ unit }} ({{ state }}){% if not loop.last %}, {% endif %}{% endfor %}"
               - "ConvertX version: {{ convertx_defaults.convertx_version }}"
               - "ConvertX JWT_SECRET and HTTP_ALLOWED and HIDE_HISTORY: observed in the process"
               - "ConvertX conversion: {{ convertx_molecule_input_name }} -> {{ convertx_molecule_output_name }}, marker survived"
