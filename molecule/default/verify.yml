@@ -120,16 +120,25 @@
           changed_when: false
           loop: "{{ convertx_verify_units }}"
 
-        - name: Wait for the ConvertX health endpoint to report ok (up to 10m)
+        - name: Wait for ConvertX to report itself healthy (up to 180s)
           ansible.builtin.uri:
             url: "{{ convertx_molecule_base_url }}/healthcheck"
             method: GET
             follow_redirects: none
             return_content: true
-          register: convertx_healthcheck
-          until: convertx_healthcheck.status == 200 and convertx_healthcheck.json.status | default('') == 'ok'
-          retries: 120
+          register: convert_health
+          until: convert_health.status == 200 and convert_health.json.status == 'ok'
+          retries: 36
           delay: 5
+          # So that giving up is reported by the assertion below rather than as a
+          # wall of systemd unit properties.
+          failed_when: false
+
+        - name: Assert ConvertX reports itself healthy
+          ansible.builtin.assert:
+            that: convert_health.json.status == 'ok'
+            fail_msg: "ConvertX did not report itself healthy: {{ convert_health.json.status | default('no response') }}"
+            success_msg: "ConvertX reports itself healthy"
 
         # ----------------------------------------------------------------------
         # The running image is the version the role pins
