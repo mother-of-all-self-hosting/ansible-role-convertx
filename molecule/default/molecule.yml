@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Slavi Pantaleev
-# SPDX-FileCopyrightText: 2026 Suguru Hirahara
 # SPDX-FileCopyrightText: 2026 spatterlight
+# SPDX-FileCopyrightText: 2026 Suguru Hirahara
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -31,6 +31,7 @@ provisioner:
       all:
         # Helper variables
         convertx_debug_service_enabled: false
+        convertx_restarts_check_enabled: true
 
         # The account the verification playbook registers and converts a file as.
         # ConvertX has no API for creating users, so the suite drives the same
