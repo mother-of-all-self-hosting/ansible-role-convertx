@@ -69,9 +69,7 @@ convertx_environment_variables_jwt_secret: YOUR_SECRET_KEY_HERE
 To use ConvertX you need to create an account and log in to it on the browser.
 
 >[!IMPORTANT]
-> Until that first account exists, ConvertX serves an unauthenticated "Create your account" form at `/setup`, and accepts a `POST /register` regardless of `convertx_environment_variables_account_registration`. That is how the first account is meant to be created, but between the moment the service becomes reachable and the moment you register, anyone who finds the hostname can claim the instance instead of you. Once they do, the window closes against you as well: with account registration disabled you would have to remove the `mydb.sqlite` database from the role's data directory (`convertx_data_path`) on the server and start over.
->
-> Create the account immediately after the first installation. If the hostname is public and you cannot do that right away, put the service behind HTTP Basic authentication for the meantime:
+> Since ConvertX serves an unauthenticated "Create your account" form at `/setup`, and accepts a `POST /register` until the first account exists regardless of `convertx_environment_variables_account_registration`, it is recommended to create the account immediately after the installation. If the hostname is public and you cannot do that right away, you should consider to put the service behind HTTP Basic authentication by adding the following configuration to your `vars.yml` file:
 >
 > ```yaml
 > convertx_container_labels_traefik_middleware_basic_auth_enabled: true
@@ -87,11 +85,7 @@ convertx_environment_variables_account_registration: true
 ```
 
 >[!WARNING]
-> ConvertX accounts are not separated into administrators and regular users, and registration has no approval step or invitation mechanism. Enabling this on a publicly reachable hostname lets anyone run ffmpeg, LibreOffice, ImageMagick and the other bundled converters on your server with files of their choosing.
->
-> Weigh that against what an account currently grants. ConvertX's LaTeX converter runs `latexmk` on uploaded documents without restricting what they may read, so an account holder can upload a `.tex` file that pulls in a file from the server and read it back out of the resulting PDF — including ConvertX's own database of accounts and password hashes. This was reported upstream as [GHSA-qwm5-vvqj-wrhc](https://github.com/C4illin/ConvertX/security/advisories/GHSA-qwm5-vvqj-wrhc) and is tracked as [issue #573](https://github.com/C4illin/ConvertX/issues/573); it is unfixed in the version this role installs. The container runs unprivileged with a read-only root filesystem, which limits the damage, but it does not prevent this.
->
-> Treat every ConvertX account as trusted, and prefer creating accounts yourself over leaving registration open.
+> ConvertX accounts are not separated into administrators and regular users, and registration has no approval step or invitation mechanism. Enabling this on a publicly reachable hostname lets anyone run ffmpeg, LibreOffice, ImageMagick and the other bundled converters on your server with files of their choosing. It is recommended to create accounts yourself instead of leaving registration open.
 
 ### Pass extra arguments to ffmpeg (optional)
 
