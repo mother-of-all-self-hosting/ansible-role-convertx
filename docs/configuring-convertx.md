@@ -122,6 +122,14 @@ If the service is hosted locally or with an authentication service like [Tinyaut
 convertx_environment_variables_allow_unauthenticated: true
 ```
 
+### Configuring the maximum number of concurrent conversion
+
+By default the number of concurrent conversion processes is unlimited. If you want to limit it to the specified number (here is two for example), add the following configuration to your `vars.yml` file:
+
+```yaml
+convertx_environment_variables_max_convert_process: 2
+```
+
 ### Extending the configuration
 
 There are some additional things you may wish to configure about the service.

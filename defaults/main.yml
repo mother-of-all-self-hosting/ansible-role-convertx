@@ -275,6 +275,12 @@ convertx_environment_variables_ffmpeg_output_args: ""
 # Control whether the history page is hidden
 convertx_environment_variables_hide_history: false
 
+# Control whether conversion history is shared between all unauthenticated users
+convertx_environment_variables_unauthenticated_user_sharing: false
+
+# Specify the maximum number of concurrent conversion processes allowed
+convertx_environment_variables_max_convert_process: 0
+
 # Additional environment variables.
 convertx_environment_variables_additional_variables: ""
 
