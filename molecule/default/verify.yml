@@ -41,6 +41,9 @@
 
   vars:
     convertx_molecule_base_url: http://localhost:3000
+    convertx_molecule_expected_image: "{{ convertx_defaults.convertx_container_image_registry_prefix_upstream_default }}c4illin/convertx:{{ convertx_defaults.convertx_version }}"
+    convertx_molecule_container: "{{ convertx_container_info.stdout | from_json | first }}"
+    convertx_molecule_image: "{{ convertx_image_info.stdout | from_json | first }}"
     convertx_molecule_input_name: convertx-molecule-probe.md
     convertx_molecule_output_name: convertx-molecule-probe.html
     convertx_molecule_libreoffice_input_name: convertx-molecule-probe.txt
@@ -145,29 +148,43 @@
         # ----------------------------------------------------------------------
 
         # ConvertX announces its own version on stdout at boot, which the systemd
-        # unit puts in the journal. This is the running process talking, not a
-        # label attached to the image by whoever built it.
+        # unit puts in the journal. Restrict it to the current invocation so a
+        # version announced by an earlier process cannot satisfy the assertion.
         - name: Read the version ConvertX announced at startup
           ansible.builtin.command:
-            cmd: journalctl --no-pager --output=cat --unit=convertx.service
+            argv:
+              - journalctl
+              - --no-pager
+              - --output=cat
+              - --unit=convertx.service
+              - "_SYSTEMD_INVOCATION_ID={{ convertx_services.results[0].status.InvocationID }}"
           register: convertx_journal
           changed_when: false
 
-        # Corroborated from the running container's own filesystem, because the
-        # journal could in principle be carrying a line from an earlier image.
-        - name: Read the version recorded in the running container
+        # Since v0.20.0 the image ships a compiled executable, without the old
+        # /app/dist/package.json. Corroborate the process's version with Docker's
+        # image identity instead, including the immutable ID behind the tag.
+        - name: Inspect the running ConvertX container
           ansible.builtin.command:
-            cmd: docker exec convertx cat /app/dist/package.json
-          register: convertx_container_package_json
+            argv: [docker, container, inspect, convertx]
+          register: convertx_container_info
+          changed_when: false
+
+        - name: Inspect the image this scenario expects the role to install
+          ansible.builtin.command:
+            argv: [docker, image, inspect, "{{ convertx_molecule_expected_image }}"]
+          register: convertx_image_info
           changed_when: false
 
         - name: Assert the running ConvertX is the version this role installs
           ansible.builtin.assert:
             that:
-              - ((convertx_container_package_json.stdout | from_json)['version']) == (convertx_defaults.convertx_version | regex_replace('^v', ''))
-              - ('ConvertX ' ~ convertx_defaults.convertx_version) in convertx_journal.stdout
-            fail_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] | default('none') }}, expected {{ convertx_defaults.convertx_version | regex_replace('^v', '') }}"
-            success_msg: "ConvertX reports {{ (convertx_container_package_json.stdout | from_json)['version'] }}"
+              - convertx_molecule_container.State.Running
+              - convertx_molecule_container.Config.Image == convertx_molecule_expected_image
+              - convertx_molecule_container.Image == convertx_molecule_image.Id
+              - ('ConvertX ' ~ convertx_defaults.convertx_version) in convertx_journal.stdout_lines
+            fail_msg: "The running container or its current startup log does not match ConvertX {{ convertx_defaults.convertx_version }}"
+            success_msg: "ConvertX {{ convertx_defaults.convertx_version }} is running from the expected image"
 
         # ----------------------------------------------------------------------
         # Negative controls, taken before an account exists
