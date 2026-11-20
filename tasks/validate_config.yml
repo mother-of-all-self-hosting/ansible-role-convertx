@@ -22,9 +22,6 @@
   with_items:
     - convertx_uid
     - convertx_gid
-    - convertx_hostname
-    - convertx_path_prefix
-    - convertx_container_network
     - convertx_environment_variables_jwt_secret
 
 - name: Run if Traefik is enabled
